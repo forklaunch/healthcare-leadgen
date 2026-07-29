@@ -1,7 +1,22 @@
 {
-  "name": "@ideas-portal/ui",
+  "name": "@forklaunch/healthcare-leadgen-ui",
   "version": "0.1.0",
-  "description": "Sealed Ideas Portal UI: themable, organization-configurable portal and admin components published from the main repo and consumed by per-customer frontends.",
+  "description": "Sealed Healthcare Leadgen portal UI: themable, organization-configurable portal and admin components published from the healthcare-leadgen repo and consumed by per-customer frontends.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/forklaunch/healthcare-leadgen.git",
+    "directory": "packages/portal-ui"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "healthcare",
+    "portal",
+    "forklaunch",
+    "react"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -18,7 +33,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css",
-    "publish:frontends": "pnpm build && pnpm pack --pack-destination ../../../ideas-frontends/vendor",
+    "pack:template": "pnpm build && pnpm pack --pack-destination ../../../template-healthcare-leadgen/vendor",
     "clean": "rm -rf dist node_modules"
   },
   "peerDependencies": {

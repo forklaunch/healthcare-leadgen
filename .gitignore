@@ -3,6 +3,9 @@
 .env.prod
 *.env.local
 
+# Generated at release time
+.forklaunch/release-manifest.json
+
 node_modules/
 dist/
 lib/

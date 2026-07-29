@@ -1,0 +1,21 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "core"
+    },
+    {
+      "path": "monitoring"
+    },
+    {
+      "path": "client-sdk"
+    },
+    {
+      "path": "iam"
+    }
+  ],
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true
+  }
+}

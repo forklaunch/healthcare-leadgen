@@ -1,0 +1,65 @@
+{
+  "name": "uchicago-ideas",
+  "version": "0.0.1",
+  "description": "UChicago Medicine ideas waitlist portal with PHI-compliant storage",
+  "keywords": [],
+  "license": "MIT",
+  "author": "Rohin Bhargava",
+  "scripts": {
+    "build": "pnpm -r --no-bail run build",
+    "clean": "rm -rf node_modules pnpm-lock.yaml tsconfig.tsbuildinfo && pnpm --parallel -r --no-bail clean && pnpm store prune",
+    "clean:purge": "pnpm run clean && pnpm store clear",
+    "database:setup": "pnpm build && pnpm migrate:init && pnpm migrate:up && pnpm seed",
+    "dev": "docker compose up",
+    "dev:build": "docker compose build --no-cache",
+    "docs": "pnpm --parallel -r --no-bail run docs",
+    "format": "biome format --write .",
+    "lint": "oxlint --config .oxlint.config.json",
+    "lint:fix": "oxlint --fix --config .oxlint.config.json",
+    "prepare": "husky",
+    "migrate:create": "docker compose up -d postgresql && pnpm -r --no-bail run migrate:create",
+    "migrate:down": "docker compose up -d postgresql && pnpm -r --no-bail run migrate:down",
+    "migrate:init": "docker compose up -d postgresql && sleep 5 && pnpm -r --no-bail run migrate:init",
+    "migrate:up": "docker compose up -d postgresql && pnpm -r --no-bail run migrate:up",
+    "seed": "docker compose up -d postgresql && pnpm -r --no-bail run seed",
+    "test": "pnpm vitest --passWithNoTests",
+    "types:build": "tsgo -b --emitDeclarationOnly",
+    "types:watch": "tsgo -b -w",
+    "up:packages": "pnpm -r update --latest"
+  },
+  "pnpm": {
+    "overrides": {
+      "eslint": "10.7.0",
+      "postcss": "8.5.22",
+      "@mongodb-js/saslprep": "1.4.12",
+      "undici": "7.28.0",
+      "hono": "4.12.31",
+      "fastmcp": "4.8.1"
+    },
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "cpu-features",
+      "esbuild",
+      "protobufjs",
+      "ssh2"
+    ],
+    "ignoredBuiltDependencies": [
+      "@scarf/scarf",
+      "tldjs"
+    ]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "^25.7.0",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "oxlint": "^0.16.6",
+    "sort-package-json": "^3.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6",
+    "@typescript/native-preview": "7.0.0-dev.20260511.1",
+    "ts-node": "^10.9.2"
+  }
+}

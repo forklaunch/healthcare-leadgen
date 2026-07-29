@@ -1,0 +1,12 @@
+# Secrets — never commit local/prod env files
+.env.local
+.env.prod
+*.env.local
+
+node_modules/
+dist/
+lib/
+*.tsbuildinfo
+.DS_Store
+.idea/
+docs/

@@ -1,0 +1,45 @@
+{
+  "name": "@uchicago-ideas/core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Core library for uchicago-ideas, containing shared foundational infrastrucuture and utilities",
+  "keywords": [],
+  "license": "MIT",
+  "author": "Rohin Bhargava",
+  "main": "lib/index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "tsgo -b",
+    "clean": "rm -rf dist lib pnpm.lock.yaml tsconfig.tsbuildinfo node_modules",
+    "docs": "typedoc --out docs *",
+    "format": "biome format --write .",
+    "lint": "oxlint --config .oxlint.config.json",
+    "lint:fix": "oxlint --fix --config .oxlint.config.json",
+    "test": "pnpm vitest --passWithNoTests"
+  },
+  "dependencies": {
+    "@forklaunch/common": "~1.2.18",
+    "@forklaunch/core": "~1.5.2",
+    "@forklaunch/express": "~1.2.32",
+    "@forklaunch/validator": "~1.2.18",
+    "@mikro-orm/core": "7.0.15",
+    "@mikro-orm/migrations": "7.0.15",
+    "@mikro-orm/postgresql": "7.0.15",
+    "@types/express": "^5.0.6",
+    "@types/express-serve-static-core": "^5.1.1",
+    "@types/qs": "^6.15.1",
+    "ajv": "^8.20.0",
+    "dotenv": "^17.4.2",
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/uuid": "^11.0.0"
+  },
+  "mikro-orm": {
+    "manifest_paths": [
+      "./mikro-orm.config.ts",
+      "./dist/mikro-orm.config.js"
+    ]
+  }
+}

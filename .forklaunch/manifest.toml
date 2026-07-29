@@ -1,0 +1,64 @@
+id = "1cb5a7b7-d8ba-492b-9b5b-1031308455c7"
+cli_version = "1.3.3"
+app_name = "uchicago-ideas"
+modules_path = "src/modules"
+app_description = "UChicago Medicine ideas waitlist portal with PHI-compliant storage"
+linter = "oxlint"
+formatter = "biome"
+validator = "zod"
+http_framework = "express"
+runtime = "node"
+test_framework = "vitest"
+author = "Rohin Bhargava"
+license = "MIT"
+platform_application_id = "1dc2b945-b68e-450f-9363-6cfaf3249bd7"
+platform_organization_id = "0dc69b58-4d61-4845-9f76-19710c36a8f9"
+
+[[projects]]
+type = "Library"
+name = "core"
+description = "Core library for uchicago-ideas, containing shared foundational infrastrucuture and utilities"
+
+[[projects]]
+type = "Library"
+name = "monitoring"
+description = "Monitoring library for uchicago-ideas, defining metrics, logs, and trace building blocks"
+
+[[projects]]
+type = "Library"
+name = "client-sdk"
+description = "Client SDK for uchicago-ideas, containing shared foundational infrastrucuture and utilities"
+
+[[projects]]
+type = "Service"
+name = "iam"
+description = "uchicago-ideas service implementation for iam, providing identity and access management APIs"
+variant = "iam-better-auth"
+routers = [
+    "organization",
+    "permission",
+    "role",
+    "user",
+]
+
+[projects.resources]
+database = "postgresql"
+
+[[projects]]
+type = "Service"
+name = "innovations"
+description = "Doctor ideas waitlist with PHI-compliant storage, secure access keys, and mutual NDA"
+routers = ["innovations"]
+
+[projects.resources]
+database = "postgresql"
+cache = "redis"
+
+[project_peer_topology]
+uchicago-ideas = [
+    "core",
+    "monitoring",
+    "client-sdk",
+    "iam",
+    "innovations",
+]

@@ -6,8 +6,9 @@ WORKDIR /uchicago-ideas
 # Copy source code
 COPY . .
 
-# Install dependencies
-RUN npm install -g pnpm
+# Install dependencies — pnpm pinned to v10: v11 (latest) rejects the
+# workspace-yaml build-script approvals and breaks `pnpm install`
+RUN npm install -g pnpm@10
 RUN apk update
 RUN apk add --no-cache libc6-compat
 RUN apk add --no-cache git

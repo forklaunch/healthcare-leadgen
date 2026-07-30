@@ -22,7 +22,6 @@ const RESEND_API_URL = 'https://api.resend.com/emails';
 export class EmailService {
   constructor(
     private readonly openTelemetryCollector: OpenTelemetryCollector<Metrics>,
-    private readonly defaultPortalUrl: string,
     private readonly resendApiKey: string,
     private readonly emailFrom: string
   ) {}
@@ -34,8 +33,9 @@ export class EmailService {
     expiresAt: Date,
     organization: Organization = getOrganization()
   ): Promise<void> {
-    const portalUrl = organization.portalUrl || this.defaultPortalUrl;
-    const magicLink = `${portalUrl}/?key=${accessKey}`;
+    // Each organization deploys its own portal frontend; the registry
+    // carries its URL (env-overridable per org via PORTAL_URL_<SLUG>).
+    const magicLink = `${organization.portalUrl}/?key=${accessKey}`;
     const expiry = expiresAt.toISOString().slice(0, 10);
     const subject = `Your ${organization.displayName} Ideas Portal access key`;
 

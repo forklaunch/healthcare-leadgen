@@ -107,11 +107,6 @@ const environmentConfig = configInjector.chain({
     type: string,
     value: getEnvVar('ENCRYPTION_KEY')
   },
-  PORTAL_URL: {
-    lifetime: Lifetime.Singleton,
-    type: string,
-    value: getEnvVar('PORTAL_URL') ?? 'http://localhost:5173'
-  },
   RESEND_API_KEY: {
     lifetime: Lifetime.Singleton,
     type: string,
@@ -201,8 +196,8 @@ const serviceDependencies = runtimeDependencies.chain({
   EmailService: {
     lifetime: Lifetime.Singleton,
     type: EmailService,
-    factory: ({ OtelCollector, PORTAL_URL, RESEND_API_KEY, EMAIL_FROM }) =>
-      new EmailService(OtelCollector, PORTAL_URL, RESEND_API_KEY, EMAIL_FROM)
+    factory: ({ OtelCollector, RESEND_API_KEY, EMAIL_FROM }) =>
+      new EmailService(OtelCollector, RESEND_API_KEY, EMAIL_FROM)
   },
   IdeaEvaluationService: {
     lifetime: Lifetime.Singleton,

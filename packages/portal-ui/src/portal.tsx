@@ -7,8 +7,7 @@ import {
   type StorageInspector
 } from './api';
 import { themeStyle, type PortalConfig } from './config';
-import { ScrambleText } from './scramble';
-import { EncryptionShowcase } from './showcase';
+import { EncryptText, ScrambleText } from './scramble';
 
 type Tab = 'submit' | 'vault' | 'how';
 
@@ -110,13 +109,34 @@ function NdaGate({
   const [nda, setNda] = useState<{ version: string; ndaText: string } | null>(null);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sealing, setSealing] = useState<{ executedAt: string } | null>(null);
+  const [sealed, setSealed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     client.getNda().then(setNda);
   }, [client]);
 
+  const executeAndSeal = async () => {
+    setBusy(true);
+    setError(null);
+    setSealing({ executedAt: new Date().toLocaleString() });
+    const started = Date.now();
+    try {
+      await client.acceptNda(accessKey);
+      // Let the sealing animation land before proceeding
+      await new Promise((r) => setTimeout(r, Math.max(0, 2400 - (Date.now() - started))));
+      setSealed(true);
+      await new Promise((r) => setTimeout(r, 1100));
+      onAccepted();
+    } catch (e) {
+      setSealing(null);
+      setBusy(false);
+      setError(e instanceof Error ? e.message : 'Could not execute the agreement');
+    }
+  };
+
   return (
-    <>
     <div className="card">
       <h2>Mutual Non-Disclosure Agreement</h2>
       <p>
@@ -125,33 +145,70 @@ function NdaGate({
         automatically, and both execution timestamps are retained.
       </p>
       {nda ? <div className="nda-text">{nda.ndaText}</div> : <p className="meta">Loading agreement…</p>}
-      <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.95rem' }}>
-        <input
-          type="checkbox"
-          style={{ width: 'auto' }}
-          checked={agree}
-          onChange={(e) => setAgree(e.target.checked)}
-        />
-        I, {me.name}, have read the agreement and execute it on my own behalf.
-      </label>
-      <button
-        className="primary"
-        disabled={!agree || busy || !nda}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await client.acceptNda(accessKey);
-            onAccepted();
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        I Accept — execute mutual NDA
-      </button>
+      {!sealing ? (
+        <>
+          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '1rem', textTransform: 'none', letterSpacing: 0, fontSize: '0.95rem' }}>
+            <input
+              type="checkbox"
+              style={{ width: 'auto' }}
+              checked={agree}
+              onChange={(e) => setAgree(e.target.checked)}
+            />
+            I, {me.name}, have read the agreement and execute it on my own behalf.
+          </label>
+          {error && <div className="error">{error}</div>}
+          <button
+            className="primary"
+            disabled={!agree || busy || !nda}
+            onClick={() => void executeAndSeal()}
+          >
+            I Accept — execute mutual NDA
+          </button>
+          <p className="meta" style={{ marginTop: '0.8rem' }}>
+            Your executed consent is encrypted with AES-256-GCM before it is
+            written to the database — you'll see it sealed as it happens.
+          </p>
+        </>
+      ) : (
+        <div style={{ marginTop: '1.2rem' }}>
+          <p>
+            <strong>Executing your agreement.</strong> The consent record is
+            being sealed with AES-256-GCM before it is written to the
+            database — this is your signature encrypting, live:
+          </p>
+          <div className="vault" aria-live="polite">
+            <div className="vault-row">
+              <span className="vault-label">signer</span>
+              <EncryptText text={me.name} />
+            </div>
+            <div className="vault-row">
+              <span className="vault-label">agreement</span>
+              <span className="vault-value plain">
+                Mutual NDA {nda?.version} — executed, counter-signed by{' '}
+                {config.organization.displayName}
+              </span>
+            </div>
+            <div className="vault-row">
+              <span className="vault-label">executed at</span>
+              <span className="vault-value plain">{sealing.executedAt}</span>
+            </div>
+            <div className="vault-note">
+              signer is PHI — encrypted at rest · agreement version and
+              timestamps are contract metadata, kept in plaintext for the
+              execution record
+            </div>
+          </div>
+          {sealed ? (
+            <p className="notice ok" style={{ marginTop: '0.9rem' }}>
+              ✓ Sealed and stored. Only your access key can unseal it — see
+              the <em>Your data</em> tab any time. Proceeding…
+            </p>
+          ) : (
+            <p className="meta" style={{ marginTop: '0.9rem' }}>Sealing…</p>
+          )}
+        </div>
+      )}
     </div>
-    <EncryptionShowcase />
-    </>
   );
 }
 

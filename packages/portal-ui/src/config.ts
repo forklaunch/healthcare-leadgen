@@ -13,6 +13,12 @@ export interface PortalTheme {
   card?: string;
 }
 
+export interface ShowcaseItem {
+  name: string;
+  description: string;
+  url?: string;
+}
+
 export interface PortalBranding {
   /** Letterhead eyebrow, e.g. "The University of Chicago Medicine". */
   institution: string;
@@ -24,6 +30,8 @@ export interface PortalBranding {
   heroEyebrow?: string;
   /** Placeholder for the email field, e.g. "you@uchicagomedicine.org". */
   emailPlaceholder?: string;
+  /** "Built on ForkLaunch" gallery items; sensible defaults when omitted. */
+  showcase?: ShowcaseItem[];
 }
 
 export interface PortalConfig {

@@ -235,6 +235,19 @@
 }
 .portal-root textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
 
+/* The submission box is the main event — give it real presence */
+.portal-root input.submit-title {
+  font-size: 1.18rem;
+  font-weight: 600;
+  padding: 0.8rem 1rem;
+}
+.portal-root textarea.submit-body {
+  min-height: 380px;
+  font-size: 1.05rem;
+  padding: 1rem 1.1rem;
+  line-height: 1.65;
+}
+
 .portal-root button.primary, .portal-root button.secondary {
   margin-top: 1.2rem;
   appearance: none;
@@ -487,6 +500,33 @@ td.cipher {
 ul.feedback { padding-left: 1.15rem; font-size: 0.89rem; line-height: 1.55; margin: 0.45rem 0 1rem; }
 ul.feedback li { margin-bottom: 0.4rem; }
 ul.feedback li::marker { color: var(--accent); }
+
+/* ── Built on ForkLaunch showcase ─────────────────────── */
+
+.showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.1rem;
+}
+.showcase-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.15rem 1.25rem;
+  background: #fdfaf3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.showcase-card h3 { margin: 0; font-variation-settings: 'opsz' 40; }
+.showcase-card .meta { flex: 1; }
+.showcase-card a {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.showcase-card a:hover { text-decoration: underline; }
 
 /* ── Admin ────────────────────────────────────────────── */
 

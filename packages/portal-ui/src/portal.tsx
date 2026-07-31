@@ -10,7 +10,7 @@ import { themeStyle, type PortalConfig } from './config';
 import { ScrambleText } from './scramble';
 import { EncryptionShowcase } from './showcase';
 
-type Tab = 'submit' | 'how';
+type Tab = 'submit' | 'vault' | 'how';
 
 const KEY_STORAGE = 'ideas-portal-access-key';
 
@@ -116,6 +116,7 @@ function NdaGate({
   }, [client]);
 
   return (
+    <>
     <div className="card">
       <h2>Mutual Non-Disclosure Agreement</h2>
       <p>
@@ -149,6 +150,8 @@ function NdaGate({
         I Accept — execute mutual NDA
       </button>
     </div>
+    <EncryptionShowcase />
+    </>
   );
 }
 
@@ -157,13 +160,15 @@ function SubmitTab({
   config,
   accessKey,
   me,
-  refreshMe
+  refreshMe,
+  onOpenVault
 }: {
   client: PortalClient;
   config: PortalConfig;
   accessKey: string | null;
   me: ProfileMe | null;
   refreshMe: () => void;
+  onOpenVault: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -204,7 +209,6 @@ function SubmitTab({
         </section>
         {flash && <div className="notice ok" style={{ marginBottom: '1rem' }}>{flash}</div>}
         <RequestAccessCard client={client} config={config} onDone={setFlash} />
-        <EncryptionShowcase />
       </>
     );
   }
@@ -306,21 +310,33 @@ function SubmitTab({
           <span className="badge ok">NDA executed ({me.acceptedNdaVersion})</span>
         </h2>
         <label>Title</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="One-line summary" />
+        <input
+          className="submit-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="One-line summary"
+        />
         <label>Describe your idea</label>
         <textarea
+          className="submit-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="What problem does it solve? Who benefits? Include clinical context as needed — submissions are stored under PHI safeguards."
         />
-        <p className="notice ok" style={{ marginTop: '1rem' }}>
-          <strong>🛡️ BAA-protected AI.</strong> Before submitting, you can have
-          your draft scored by our AI evaluator. It runs on an Azure AI
-          Foundry endpoint covered by a Business Associate Agreement (BAA), so
-          it is held to the same HIPAA safeguards as the rest of this portal:
-          your draft is encrypted in transit, is never used to train models,
-          and is not retained by the AI provider. Nothing is stored in the
-          portal until you press Submit.
+        <p className="meta" style={{ marginTop: '0.9rem' }}>
+          🛡️ AI evaluation runs under Microsoft's Azure BAA — encrypted in
+          transit, never used for training. Nothing is stored until you press
+          Submit, and everything stored is{' '}
+          <a
+            href="#vault"
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenVault();
+            }}
+          >
+            sealed in your encrypted record
+          </a>
+          .
         </p>
         {changes && changes.length > 0 && (
           <div className="notice" style={{ marginTop: '1rem' }}>
@@ -560,47 +576,96 @@ function StorageInspectorCard({
   );
 }
 
-function HowItWorksTab({
+/** Signed-in "Your data" screen: profile + the live database decryption. */
+function VaultTab({
   client,
-  config,
   me,
   accessKey
 }: {
   client: PortalClient;
-  config: PortalConfig;
-  me: ProfileMe | null;
-  accessKey: string | null;
+  me: ProfileMe;
+  accessKey: string;
 }) {
+  return (
+    <>
+      <div className="card">
+        <h2>
+          Welcome back, {me.name}
+          {me.ndaAccepted ? (
+            <span className="badge ok">NDA executed</span>
+          ) : (
+            <span className="badge warn">NDA pending</span>
+          )}
+        </h2>
+        <dl className="kv">
+          <dt>Email</dt>
+          <dd>{me.email}</dd>
+          <dt>Organization</dt>
+          <dd>{me.organizationName}</dd>
+          <dt>Department</dt>
+          <dd>{me.department ?? '—'}</dd>
+          <dt>Access key expires</dt>
+          <dd>{new Date(me.keyExpiresAt).toLocaleString()}</dd>
+          <dt>Ideas submitted</dt>
+          <dd>{me.ideas.length}</dd>
+        </dl>
+      </div>
+      <StorageInspectorCard client={client} accessKey={accessKey} />
+    </>
+  );
+}
+
+const DEFAULT_SHOWCASE = [
+  {
+    name: 'This Ideas Portal',
+    description:
+      'Encryption at rest, mutual NDA execution, and BAA-covered AI evaluation — built and deployed in about 30 minutes.',
+    url: 'https://github.com/forklaunch/template-healthcare-leadgen'
+  },
+  {
+    name: 'Healthcare Leadgen Platform',
+    description:
+      'The multi-tenant backend behind this portal — one API serving multiple health systems with per-tenant encryption keys and row isolation.',
+    url: 'https://github.com/forklaunch/healthcare-leadgen'
+  },
+  {
+    name: 'Sealed portal components',
+    description:
+      'The interface you are using right now, published as an npm package — a new hospital portal is one configuration file.',
+    url: 'https://www.npmjs.com/package/@forklaunch/healthcare-leadgen-ui'
+  }
+];
+
+function ShowcaseSection({ config }: { config: PortalConfig }) {
+  const items = config.branding.showcase ?? DEFAULT_SHOWCASE;
+  return (
+    <div className="card">
+      <h2>Built on ForkLaunch</h2>
+      <p>
+        The same platform this portal runs on — compliance enforced by the
+        software itself, not by policy.
+      </p>
+      <div className="showcase-grid">
+        {items.map((item) => (
+          <div className="showcase-card" key={item.name}>
+            <h3>{item.name}</h3>
+            <p className="meta">{item.description}</p>
+            {item.url && (
+              <a href={item.url} target="_blank" rel="noreferrer">
+                See the code →
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HowItWorksTab({ config }: { config: PortalConfig }) {
   const org = config.organization.displayName;
   return (
     <>
-      {me && accessKey && (
-        <>
-          <div className="card">
-            <h2>
-              Welcome back, {me.name}
-              {me.ndaAccepted ? (
-                <span className="badge ok">NDA executed</span>
-              ) : (
-                <span className="badge warn">NDA pending</span>
-              )}
-            </h2>
-            <dl className="kv">
-              <dt>Email</dt>
-              <dd>{me.email}</dd>
-              <dt>Organization</dt>
-              <dd>{me.organizationName}</dd>
-              <dt>Department</dt>
-              <dd>{me.department ?? '—'}</dd>
-              <dt>Access key expires</dt>
-              <dd>{new Date(me.keyExpiresAt).toLocaleString()}</dd>
-              <dt>Ideas submitted</dt>
-              <dd>{me.ideas.length}</dd>
-            </dl>
-          </div>
-          <StorageInspectorCard client={client} accessKey={accessKey} />
-        </>
-      )}
       <div className="card">
         <h2>How your ideas are protected</h2>
         <p className="notice warn">
@@ -632,8 +697,9 @@ function HowItWorksTab({
             Anything sensitive — your name, your email, your idea — is
             encrypted the moment it's saved. Someone who stole the database
             would see only scrambled text. You don't have to take our word
-            for it: with your access key, you can see your own record in its
-            sealed form above, and unseal it yourself.
+            for it: with your access key, the <em>Your data</em> tab shows
+            your own record in its sealed form, and lets you unseal it
+            yourself.
           </li>
           <li>
             <strong>We can find your chart without opening it.</strong> The
@@ -688,16 +754,7 @@ function HowItWorksTab({
         </p>
       </div>
 
-      {!(me && accessKey) && (
-        <>
-          <EncryptionShowcase />
-          <p className="notice">
-            Have a secure access link? Open it from your email and come back to
-            this tab — you'll see your own records exactly as they sit in the
-            database, encrypted, with a key to decrypt them yourself.
-          </p>
-        </>
-      )}
+      <ShowcaseSection config={config} />
     </>
   );
 }
@@ -738,15 +795,21 @@ export function PortalApp({ config }: { config: PortalConfig }) {
           <button className={tab === 'submit' ? 'active' : ''} onClick={() => setTab('submit')}>
             Submit an idea
           </button>
+          {me && accessKey && (
+            <button className={tab === 'vault' ? 'active' : ''} onClick={() => setTab('vault')}>
+              Your data
+              <span className="tab-dot" aria-hidden="true" title="live from the database" />
+            </button>
+          )}
           <button className={tab === 'how' ? 'active' : ''} onClick={() => setTab('how')}>
             How it works
-            <span className="tab-dot" aria-hidden="true" title="live encryption demo" />
           </button>
         </div>
       </nav>
       <main>
-        {tab === 'how' && (
-          <HowItWorksTab client={client} config={config} me={me} accessKey={accessKey} />
+        {tab === 'how' && <HowItWorksTab config={config} />}
+        {tab === 'vault' && me && accessKey && (
+          <VaultTab client={client} me={me} accessKey={accessKey} />
         )}
         {tab === 'submit' && (
           <SubmitTab
@@ -755,6 +818,7 @@ export function PortalApp({ config }: { config: PortalConfig }) {
             accessKey={accessKey}
             me={me}
             refreshMe={refreshMe}
+            onOpenVault={() => setTab('vault')}
           />
         )}
       </main>

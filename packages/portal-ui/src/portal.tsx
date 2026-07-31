@@ -124,10 +124,12 @@ function NdaGate({
     const started = Date.now();
     try {
       await client.acceptNda(accessKey);
-      // Let the sealing animation land before proceeding
-      await new Promise((r) => setTimeout(r, Math.max(0, 2400 - (Date.now() - started))));
+      // Let the sealing animation land before proceeding — the encrypt
+      // animation runs ~3.6s; hold until it finishes, then linger on the
+      // sealed confirmation so it registers
+      await new Promise((r) => setTimeout(r, Math.max(0, 4300 - (Date.now() - started))));
       setSealed(true);
-      await new Promise((r) => setTimeout(r, 1100));
+      await new Promise((r) => setTimeout(r, 2000));
       onAccepted();
     } catch (e) {
       setSealing(null);

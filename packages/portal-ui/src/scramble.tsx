@@ -24,7 +24,8 @@ export function EncryptText({
   useEffect(() => {
     const cipher = `v2:${randomCipher(6)}:${randomCipher(Math.max(text.length, 14))}`;
     let frame = 0;
-    const total = 22;
+    // Deliberately slow (~3.6s) — the sealing is the show, let it be seen
+    const total = 40;
     const id = setInterval(() => {
       frame += 1;
       const n = Math.ceil((frame / total) * cipher.length);
@@ -35,7 +36,7 @@ export function EncryptText({
         clearInterval(id);
         onDone?.();
       }
-    }, 60);
+    }, 90);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);

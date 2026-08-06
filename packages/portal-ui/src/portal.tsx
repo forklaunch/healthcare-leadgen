@@ -4,7 +4,8 @@ import {
   type EvaluationFocus,
   type IdeaEvaluation,
   type ProfileMe,
-  type StorageInspector
+  type StorageInspector,
+  type StorageSection
 } from './api';
 import { themeStyle, type PortalConfig } from './config';
 import { EncryptText, ScrambleText } from './scramble';
@@ -214,6 +215,94 @@ function NdaGate({
   );
 }
 
+/**
+ * Post-submission proof modal: the idea's actual row in Postgres, read back
+ * moments after it was written — sealed, decryptable, with a path to the
+ * full Your-data inspector.
+ */
+function SealedProofModal({
+  client,
+  accessKey,
+  section,
+  onClose,
+  onOpenVault
+}: {
+  client: PortalClient;
+  accessKey: string;
+  section: StorageSection;
+  onClose: () => void;
+  onOpenVault: () => void;
+}) {
+  const [decrypted, setDecrypted] = useState<StorageSection | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const fields = (decrypted ?? section).fields.filter((f) =>
+    ['title', 'body'].includes(f.column)
+  );
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true">
+      <div className="modal">
+        <h2>
+          Submitted — and already sealed
+          <span className="badge gold">live from Postgres</span>
+        </h2>
+        <p>
+          This is your idea's actual database row, read back just now. It was
+          encrypted <em>before</em> it was written — this scrambled text is
+          all that exists on disk:
+        </p>
+        <div className="vault">
+          {fields.map((f) => (
+            <div className="vault-row" key={f.column}>
+              <span className="vault-label">{f.column}</span>
+              {decrypted && f.decrypted !== undefined ? (
+                <span className="vault-value plain">
+                  <ScrambleText text={f.decrypted} />
+                </span>
+              ) : (
+                <span className="vault-value">{f.stored}</span>
+              )}
+            </div>
+          ))}
+          <div className="vault-note">
+            table: idea · AES-256-GCM · key derived for your organization
+          </div>
+        </div>
+        <div className="btn-row">
+          {!decrypted ? (
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const d = await client.getStorageInspector(accessKey, true);
+                  const ideaSection = d?.sections.find(
+                    (s) => s.table === 'idea'
+                  );
+                  if (ideaSection) setDecrypted(ideaSection);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              🔑 Decrypt it with your access key
+            </button>
+          ) : (
+            <button className="primary" onClick={onOpenVault}>
+              See your full record — Your data →
+            </button>
+          )}
+          <button className="secondary" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SubmitTab({
   client,
   config,
@@ -241,6 +330,7 @@ function SubmitTab({
   const [improving, setImproving] = useState<EvaluationFocus | null>(null);
   const [changes, setChanges] = useState<string[] | null>(null);
   const [evaluatedDraft, setEvaluatedDraft] = useState<{ title: string; body: string } | null>(null);
+  const [sealedSection, setSealedSection] = useState<StorageSection | null>(null);
 
   if (!accessKey || !me) {
     return (
@@ -363,6 +453,18 @@ function SubmitTab({
 
   return (
     <>
+      {sealedSection && (
+        <SealedProofModal
+          client={client}
+          accessKey={accessKey}
+          section={sealedSection}
+          onClose={() => setSealedSection(null)}
+          onOpenVault={() => {
+            setSealedSection(null);
+            onOpenVault();
+          }}
+        />
+      )}
       <div className="card">
         <h2>
           Submit an idea
@@ -437,6 +539,12 @@ function SubmitTab({
                 setChanges(null);
                 setEvaluatedDraft(null);
                 refreshMe();
+                // The proof moment: read the just-written row back, sealed
+                const inspector = await client.getStorageInspector(accessKey, false);
+                const ideaSection = inspector?.sections.find(
+                  (s) => s.table === 'idea'
+                );
+                if (ideaSection) setSealedSection(ideaSection);
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Submission failed');
               } finally {

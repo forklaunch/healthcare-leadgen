@@ -406,7 +406,7 @@ export const adminListIdeas = handlers.get(
       jwt: {
         jwksPublicKeyUrl: JWKS_PUBLIC_KEY_URL
       },
-      allowedRoles: new Set([ROLES.ADMIN])
+      allowedRoles: new Set([ROLES.ADMIN, 'owner'])
     },
     query: { organization: optional(string), decrypt: optional(string) },
     responses: {
@@ -454,7 +454,7 @@ export const adminScoreIdeaRoi = handlers.post(
       jwt: {
         jwksPublicKeyUrl: JWKS_PUBLIC_KEY_URL
       },
-      allowedRoles: new Set([ROLES.ADMIN])
+      allowedRoles: new Set([ROLES.ADMIN, 'owner'])
     },
     params: { ideaId: string },
     query: { organization: string },

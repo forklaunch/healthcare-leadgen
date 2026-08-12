@@ -22,7 +22,7 @@
     "migrate:init": "if [ ! -f migrations/Migration* ]; then [ -z $DOTENV_FILE_PATH ] && export DOTENV_FILE_PATH=.env.local; NODE_OPTIONS='--import=tsx' mikro-orm migration:create --initial; fi",
     "migrate:up": "[ -z $DOTENV_FILE_PATH ] && export DOTENV_FILE_PATH=.env.local; NODE_OPTIONS='--import=tsx' mikro-orm migration:up",
     "seed": "[ -z $DOTENV_FILE_PATH ] && export DOTENV_FILE_PATH=.env.local; NODE_OPTIONS='--import=tsx' mikro-orm seeder:run",
-    "start": "[ -f .env.prod ] && export DOTENV_FILE_PATH=.env.prod; pnpm migrate:up && [ -f .env.prod ] && export DOTENV_FILE_PATH=.env.prod; node --import=tsx dist/server.js",
+    "start": "if [ -f .env.prod ]; then export DOTENV_FILE_PATH=.env.prod; fi; pnpm migrate:up && node --import=tsx dist/server.js",
     "start:server": "[ -f .env.prod ] && export DOTENV_FILE_PATH=.env.prod; pnpm migrate:up && [ -f .env.prod ] && export DOTENV_FILE_PATH=.env.prod; node --import=tsx dist/server.js",
     "test": "pnpm vitest --passWithNoTests",
     "retention:enforce": "pnpm tsx scripts/enforce-retention.ts"

@@ -144,4 +144,38 @@ app.listen(port, host, () => {
   openTelemetryCollector.info(
     `🎉 IAM Server is running at http://${host}:${port} 🎉.\nAn API reference can be accessed at http://${host}:${port}/api/${version}${docsPath}`
   );
+  void seedAdminList();
 });
+
+/**
+ * Boot-time admin seeding (idempotent). ADMIN_SEED_EMAILS is a comma-separated
+ * allowlist; each email is guaranteed an admin account in the ideas-program
+ * org. Newly provisioned accounts get a one-time password that is logged
+ * exactly once — rotate it via sign-in immediately. Existing accounts are
+ * left untouched. Never throws: seeding failure must not take the IAM down.
+ */
+async function seedAdminList() {
+  const emails = (process.env.ADMIN_SEED_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (emails.length === 0) return;
+  try {
+    const scope = ci.createScope();
+    const adminManagement = ci.scopedResolver(tokens.AdminManagementService)({
+      scope
+    });
+    const results = await adminManagement.seedAdmins(emails);
+    for (const r of results) {
+      openTelemetryCollector.info(
+        r.created
+          ? `[admin-seed] provisioned ${r.email} — one-time password: ${r.temporaryPassword} (sign in and rotate immediately)`
+          : `[admin-seed] ${r.email} already on the admin list`
+      );
+    }
+  } catch (error) {
+    openTelemetryCollector.error(
+      `[admin-seed] failed: ${(error as Error).message}`
+    );
+  }
+}

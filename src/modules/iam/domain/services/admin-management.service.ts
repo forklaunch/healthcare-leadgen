@@ -49,6 +49,44 @@ export class AdminManagementService {
     return org;
   };
 
+  private ensureAdminOrg = async () => {
+    const existing = await this.em.findOne(Organization, {
+      slug: ADMIN_ORG_SLUG
+    });
+    if (existing) return existing;
+    const org = this.em.create(Organization, {
+      name: ADMIN_ORG_NAME,
+      slug: ADMIN_ORG_SLUG,
+      logo: null,
+      metadata: null,
+      domain: null,
+      subscription: 'free',
+      status: 'active'
+    });
+    await this.em.flush();
+    return org;
+  };
+
+  /**
+   * Idempotent boot-time seeding: guarantees the admin org exists and every
+   * email on the list is an admin. New accounts get a generated one-time
+   * password (returned so the caller can surface it exactly once — in dev
+   * that's the service log). Safe to run on every deploy.
+   */
+  seedAdmins = async (emails: string[]): Promise<AddAdminResult[]> => {
+    await this.ensureAdminOrg();
+    const results: AddAdminResult[] = [];
+    for (const raw of emails) {
+      const email = raw.trim().toLowerCase();
+      if (!email) continue;
+      const localPart = email.split('@')[0] ?? email;
+      const name =
+        localPart.charAt(0).toUpperCase() + localPart.slice(1).toLowerCase();
+      results.push(await this.addAdmin({ email, name }));
+    }
+    return results;
+  };
+
   listAdmins = async (): Promise<AdminSummary[]> => {
     const org = await this.getAdminOrg();
     const members = await this.em.find(Member, {

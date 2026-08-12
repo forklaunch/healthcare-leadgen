@@ -1,10 +1,16 @@
 export { PortalApp } from './portal';
 export { AdminApp } from './admin';
+export { PortalWithAdmin } from './root';
 export { EncryptionShowcase } from './showcase';
 export { ScrambleText, randomCipher } from './scramble';
 export { PortalClient, AdminClient } from './api';
 export type {
+  AddAdminResult,
   AdminIdea,
+  AdminIdeaStored,
+  AdminSummary,
+  RoiDimension,
+  RoiScore,
   EvaluationDimension,
   EvaluationFocus,
   IdeaEvaluation,

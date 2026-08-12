@@ -16,7 +16,8 @@ import { EmailService } from './email.service';
 import {
   IdeaEvaluationService,
   type IdeaEvaluation,
-  type IdeaRefinement
+  type IdeaRefinement,
+  type RoiScore
 } from './idea-evaluation.service';
 
 /** Default tenant, kept for backward compatibility with older callers. */
@@ -374,7 +375,14 @@ export class PortalService {
   };
 
   /** Admin view: every idea with submitter identity and NDA execution. */
-  adminListIdeas = async () => {
+  /**
+   * Consolidated admin listing. PHI ships encrypted by default: the stored
+   * ciphertext for title/body/submitter is returned as-is, and plaintext is
+   * only decrypted and included when the admin explicitly asks (decrypt=true)
+   * — so the default listing can be rendered without PHI ever leaving the
+   * database in readable form.
+   */
+  adminListIdeas = async (decrypt = false) => {
     const ideas = await this.em.find(
       IdeaEntity,
       {},
@@ -384,24 +392,82 @@ export class PortalService {
       doctor: { $in: [...new Set(ideas.map((i) => i.doctor.id))] }
     });
     const ndaByDoctor = new Map(ndas.map((n) => [n.doctor.id, n]));
+
+    // Raw rows carry the at-rest ciphertext for the encrypted columns.
+    const conn = this.em.getConnection();
+    const rawIdeaRows = ideas.length
+      ? ((await conn.execute(
+          `select i.id, i.title, i.body, i.roi_score, d.name as doctor_name, d.email as doctor_email, d.department as doctor_department
+           from idea i join doctor d on d.id = i.doctor_id
+           where i.id in (${ideas.map(() => '?').join(',')})`,
+          ideas.map((i) => i.id)
+        )) as Array<Record<string, string | null>>)
+      : [];
+    const rawById = new Map(rawIdeaRows.map((r) => [r.id, r]));
+
     return {
       ideas: ideas.map((idea) => {
         const nda = ndaByDoctor.get(idea.doctor.id);
+        const raw = rawById.get(idea.id);
         return {
           id: idea.id,
-          title: idea.title,
-          body: idea.body,
           status: idea.status,
           submittedAt: idea.createdAt.toISOString(),
           organizationId: this.organization.slug,
           organizationName: this.organization.displayName,
-          doctorName: idea.doctor.name,
-          doctorEmail: idea.doctor.email,
-          doctorDepartment: idea.doctor.department ?? undefined,
           ndaVersion: nda?.ndaVersion,
-          ndaExecutedAt: nda?.orgCountersignedAt.toISOString()
+          ndaExecutedAt: nda?.orgCountersignedAt.toISOString(),
+          stored: {
+            title: raw?.title ?? '(null)',
+            body: raw?.body ?? '(null)',
+            doctorName: raw?.doctor_name ?? '(null)',
+            doctorEmail: raw?.doctor_email ?? '(null)',
+            doctorDepartment: raw?.doctor_department ?? undefined,
+            roiScore: raw?.roi_score ?? undefined
+          },
+          // Plaintext leaves the service only on an explicit decrypt request.
+          ...(decrypt
+            ? {
+                title: idea.title,
+                body: idea.body,
+                doctorName: idea.doctor.name,
+                doctorEmail: idea.doctor.email,
+                doctorDepartment: idea.doctor.department ?? undefined,
+                roiScore: parseRoiScore(idea.roiScore)
+              }
+            : {})
         };
       })
     };
   };
+
+  /**
+   * AI-scores a submitted idea on the administrator ROI axes (length-of-stay
+   * reduction, throughput improvement, patient satisfaction) and persists the
+   * result on the idea. Re-scoring overwrites the previous score.
+   */
+  adminScoreIdeaRoi = async (ideaId: string): Promise<RoiScore> => {
+    const idea = await this.em.findOne(IdeaEntity, { id: ideaId });
+    if (!idea) {
+      throw new IdeaNotFoundError(`Idea ${ideaId} was not found`);
+    }
+    const roiScore = await this.ideaEvaluationService.scoreRoi({
+      title: idea.title,
+      body: idea.body
+    });
+    idea.roiScore = JSON.stringify(roiScore);
+    await this.em.flush();
+    return roiScore;
+  };
+}
+
+export class IdeaNotFoundError extends Error {}
+
+function parseRoiScore(serialized: string | null | undefined): RoiScore | undefined {
+  if (!serialized) return undefined;
+  try {
+    return JSON.parse(serialized) as RoiScore;
+  } catch {
+    return undefined;
+  }
 }

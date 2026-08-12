@@ -29,6 +29,7 @@ import { ForkOptions } from '@mikro-orm/core';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
 import { betterAuth } from 'better-auth';
 import { BetterAuth, betterAuthConfig } from './auth';
+import { AdminManagementService } from './domain/services/admin-management.service';
 import { SurfacingService } from './domain/services/surfacing.service';
 import mikroOrmOptionsConfig from './mikro-orm.config';
 
@@ -244,6 +245,15 @@ const expressApplicationOptions = serviceDependencies.chain({
     type: RetentionService,
     factory: ({ Orm, OtelCollector }) =>
       new RetentionService(Orm, OtelCollector)
+  },
+  AdminManagementService: {
+    lifetime: Lifetime.Scoped,
+    type: AdminManagementService,
+    factory: ({ EntityManager, BetterAuth: betterAuthInstance }) =>
+      new AdminManagementService(
+        EntityManager,
+        betterAuthInstance as BetterAuth
+      )
   }
 });
 

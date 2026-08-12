@@ -21,6 +21,9 @@ export const IdeaEntity = defineComplianceEntity({
     title: fp.string().compliance('phi'),
     body: fp.text().compliance('phi'),
     status: fp.enum(() => IdeaStatusEnum).compliance('none'),
+    // Serialized RoiScore JSON; PHI-classified because rationales reference
+    // idea content. Null until an admin runs ROI scoring.
+    roiScore: fp.text().nullable().compliance('phi'),
     doctor: () => fp.manyToOne(DoctorEntity),
     organizationId: fp.string().index().compliance('none')
   }

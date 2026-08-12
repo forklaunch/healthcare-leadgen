@@ -10,6 +10,7 @@ import {
   betterAuthTelemetryHookMiddleware,
   enrichBetterAuthApi
 } from './api/middlewares/betterAuth.middleware';
+import { adminRouter } from './api/routes/admin.routes';
 import { discoveryRouter } from './api/routes/discovery.routes';
 import { userRouter } from './api/routes/user.routes';
 import { complianceRouter } from './api/routes/compliance.routes';
@@ -132,6 +133,7 @@ const docsPath = ci.resolve(tokens.DOCS_PATH);
 //! mounts the routes to the app
 app.use(discoveryRouter);
 app.use(userRouter);
+app.use(adminRouter);
 app.use(complianceRouter);
 
 //! register the sdk client

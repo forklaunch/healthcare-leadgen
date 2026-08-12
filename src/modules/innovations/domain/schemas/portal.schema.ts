@@ -118,19 +118,49 @@ export const StorageInspectorResponseSchema = {
 };
 
 // GET /admin/ideas
-export const AdminIdeaSchema = {
-  id: uuid,
+// Administrator ROI scoring (length of stay, throughput, patient satisfaction)
+export const RoiDimensionSchema = {
+  key: string,
+  name: string,
+  score: number,
+  rationale: string,
+  validationSteps: array(string)
+};
+
+export const RoiScoreResponseSchema = {
+  summary: string,
+  roiIndex: number,
+  generatedBy: string,
+  scoredAt: string,
+  dimensions: array(RoiDimensionSchema)
+};
+
+// At-rest ciphertext for the PHI columns — always present so the admin table
+// renders encrypted-first; plaintext fields appear only when decrypt=true.
+export const AdminIdeaStoredSchema = {
   title: string,
   body: string,
+  doctorName: string,
+  doctorEmail: string,
+  doctorDepartment: optional(string),
+  roiScore: optional(string)
+};
+
+export const AdminIdeaSchema = {
+  id: uuid,
   status: string,
   submittedAt: string,
   organizationId: string,
   organizationName: string,
-  doctorName: string,
-  doctorEmail: string,
-  doctorDepartment: optional(string),
   ndaVersion: optional(string),
-  ndaExecutedAt: optional(string)
+  ndaExecutedAt: optional(string),
+  stored: AdminIdeaStoredSchema,
+  title: optional(string),
+  body: optional(string),
+  doctorName: optional(string),
+  doctorEmail: optional(string),
+  doctorDepartment: optional(string),
+  roiScore: optional(RoiScoreResponseSchema)
 };
 
 export const AdminIdeasResponseSchema = {

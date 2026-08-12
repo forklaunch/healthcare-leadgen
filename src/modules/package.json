@@ -35,18 +35,7 @@
       "undici": "7.28.0",
       "hono": "4.12.31",
       "fastmcp": "4.8.1"
-    },
-    "onlyBuiltDependencies": [
-      "@biomejs/biome",
-      "cpu-features",
-      "esbuild",
-      "protobufjs",
-      "ssh2"
-    ],
-    "ignoredBuiltDependencies": [
-      "@scarf/scarf",
-      "tldjs"
-    ]
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

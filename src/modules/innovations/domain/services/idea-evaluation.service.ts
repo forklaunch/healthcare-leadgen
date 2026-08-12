@@ -10,6 +10,31 @@ export const EVALUATION_DIMENSIONS = {
 
 export type EvaluationDimensionKey = keyof typeof EVALUATION_DIMENSIONS;
 
+/** The three ROI axes hospital administrators score ideas on. */
+export const ROI_DIMENSIONS = {
+  lengthOfStay: 'Length-of-Stay Reduction',
+  throughput: 'Throughput Improvement',
+  patientSatisfaction: 'Patient Satisfaction'
+} as const;
+
+export type RoiDimensionKey = keyof typeof ROI_DIMENSIONS;
+
+export interface RoiDimension {
+  key: string;
+  name: string;
+  score: number;
+  rationale: string;
+  validationSteps: string[];
+}
+
+export interface RoiScore {
+  summary: string;
+  roiIndex: number;
+  generatedBy: string;
+  scoredAt: string;
+  dimensions: RoiDimension[];
+}
+
 export interface EvaluationDimension {
   key: string;
   name: string;
@@ -46,6 +71,26 @@ Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
   "title": "revised title",
   "body": "revised draft description",
   "changes": ["short bullet describing each substantive addition or change", "..."]
+}`;
+
+const ROI_SYSTEM_PROMPT = `You are a hospital operations and finance analyst scoring ideas submitted to a health system's innovation program. Your audience is hospital administrators who decide which ideas to fund based on return on investment. Score each idea honestly and rigorously on exactly three ROI axes:
+
+1. lengthOfStay — Potential to reduce inpatient length of stay. Consider which patient populations and DRGs are affected, expected reduction in bed-days, discharge-process impact, and how directly the idea acts on known LOS drivers (discharge planning, care coordination, complication avoidance).
+2. throughput — Potential to increase throughput: more patients served with the same capacity. Consider OR/procedure-room utilization, clinic slot yield, ED boarding and door-to-provider time, turnover time, and bottleneck relief.
+3. patientSatisfaction — Potential to improve patient satisfaction and experience (HCAHPS and equivalent). Consider communication, waiting, care transitions, and whether the improvement is one patients actually perceive.
+
+Scores are 0-100 and reflect ROI potential, not idea quality in the abstract: a scientifically interesting idea with no operational lever scores low; a mundane idea that clearly removes a bottleneck scores high. Be a tough grader — reserve 80+ for ideas with a direct, plausible, quantifiable mechanism.
+
+For each axis, give a 1-2 sentence rationale grounded in the idea's specifics, and 2-4 validationSteps: the concrete data pulls or measurements an administrator should run to validate the ROI before funding (e.g. "Pull average LOS for DRG 470 patients in the affected unit for the last 12 months").
+
+Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
+{
+  "summary": "2-3 sentence overall ROI assessment written for a hospital administrator",
+  "dimensions": [
+    { "key": "lengthOfStay", "score": 0, "rationale": "...", "validationSteps": ["...", "..."] },
+    { "key": "throughput", "score": 0, "rationale": "...", "validationSteps": ["..."] },
+    { "key": "patientSatisfaction", "score": 0, "rationale": "...", "validationSteps": ["..."] }
+  ]
 }`;
 
 const SYSTEM_PROMPT = `You are an innovation evaluator for UChicago Medicine's physician ideas program. Physicians submit early-stage clinical, research, and operational ideas. Evaluate each idea honestly and rigorously through exactly three lenses:
@@ -133,6 +178,27 @@ export class IdeaEvaluationService {
 
     const raw = await this.callFoundry(userPrompt, REFINE_SYSTEM_PROMPT);
     return this.parseRefinement(raw, data);
+  };
+
+  /**
+   * Scores an idea on the three administrator ROI axes: length-of-stay
+   * reduction, throughput improvement, and patient satisfaction.
+   */
+  scoreRoi = async (data: { title: string; body: string }): Promise<RoiScore> => {
+    if (!this.foundryEndpoint || !this.foundryApiKey) {
+      this.openTelemetryCollector.info(
+        '[evaluation] FOUNDRY_ENDPOINT/FOUNDRY_API_KEY not set — returning offline sample ROI score'
+      );
+      return this.offlineRoiSample(data);
+    }
+
+    const raw = await this.callFoundry(
+      [`Idea title: ${data.title}`, '', 'Idea description:', data.body].join(
+        '\n'
+      ),
+      ROI_SYSTEM_PROMPT
+    );
+    return this.parseRoi(raw);
   };
 
   private normalizeFocus = (
@@ -292,6 +358,89 @@ export class IdeaEvaluationService {
       summary: parsed.summary?.trim() || 'No overall summary returned.',
       focus,
       generatedBy: this.foundryModel || 'foundry',
+      dimensions
+    };
+  };
+
+  private parseRoi = (raw: string): RoiScore => {
+    let parsed: {
+      summary?: string;
+      dimensions?: Array<{
+        key?: string;
+        score?: number;
+        rationale?: string;
+        validationSteps?: string[];
+      }>;
+    };
+    try {
+      const start = raw.indexOf('{');
+      const end = raw.lastIndexOf('}');
+      if (start === -1 || end <= start) throw new Error('no JSON object found');
+      parsed = JSON.parse(raw.slice(start, end + 1));
+    } catch (error) {
+      this.openTelemetryCollector.error(
+        `[evaluation] Could not parse ROI output: ${(error as Error).message}`
+      );
+      throw new EvaluationUnavailableError(
+        'The AI ROI scoring service returned an unreadable response'
+      );
+    }
+
+    const byKey = new Map(
+      (parsed.dimensions ?? []).map((d) => [d.key, d] as const)
+    );
+    const dimensions = (
+      Object.entries(ROI_DIMENSIONS) as Array<[RoiDimensionKey, string]>
+    ).map(([key, name]) => {
+      const d = byKey.get(key);
+      return {
+        key,
+        name,
+        score: clampScore(d?.score),
+        rationale: d?.rationale?.trim() || 'No assessment returned.',
+        validationSteps: (d?.validationSteps ?? [])
+          .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+          .map((s) => s.trim())
+      };
+    });
+
+    return {
+      summary: parsed.summary?.trim() || 'No overall ROI summary returned.',
+      roiIndex: Math.round(
+        dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length
+      ),
+      generatedBy: this.foundryModel || 'foundry',
+      scoredAt: new Date().toISOString(),
+      dimensions
+    };
+  };
+
+  /** Deterministic stand-in ROI score for unconfigured local dev. */
+  private offlineRoiSample = (data: {
+    title: string;
+    body: string;
+  }): RoiScore => {
+    const detail = Math.min(40, Math.floor(data.body.length / 40));
+    const dimensions = (
+      Object.entries(ROI_DIMENSIONS) as Array<[RoiDimensionKey, string]>
+    ).map(([key, name], index) => ({
+      key,
+      name,
+      score: clampScore(30 + detail + index * 7),
+      rationale: `Offline sample ROI assessment of "${data.title}" for ${name.toLowerCase()} — connect a Foundry endpoint for a real analysis.`,
+      validationSteps: [
+        `Identify the baseline metric this idea would move for ${name.toLowerCase()}.`,
+        'Set FOUNDRY_ENDPOINT, FOUNDRY_API_KEY, and FOUNDRY_MODEL to enable real AI scoring.'
+      ]
+    }));
+    return {
+      summary:
+        'Offline sample ROI score — the Foundry endpoint is not configured, so these scores are placeholders based on draft length only.',
+      roiIndex: Math.round(
+        dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length
+      ),
+      generatedBy: 'offline-sample',
+      scoredAt: new Date().toISOString(),
       dimensions
     };
   };

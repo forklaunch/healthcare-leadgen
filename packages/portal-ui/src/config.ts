@@ -53,6 +53,14 @@ export interface AdminConfig {
   apiUrl: string;
   /** IAM base URL for administrator sign-in, e.g. http://localhost:9100 */
   iamUrl: string;
+  /**
+   * When set, this admin surface is hosted inside one organization's portal
+   * and is locked to that organization's ideas (no cross-org browsing).
+   */
+  organization?: {
+    slug: string;
+    displayName: string;
+  };
   branding?: Partial<PortalBranding>;
   theme?: PortalTheme;
 }

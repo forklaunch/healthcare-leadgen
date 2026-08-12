@@ -17,11 +17,13 @@ import {
   NdaResponseSchema,
   RequestAccessResponseSchema,
   RequestAccessSchema,
+  RoiScoreResponseSchema,
   StorageInspectorResponseSchema,
   SubmitIdeaSchema
 } from '../../domain/schemas/portal.schema';
 import { EvaluationUnavailableError } from '../../domain/services/idea-evaluation.service';
 import {
+  IdeaNotFoundError,
   InvalidAccessKeyError,
   NdaNotAcceptedError
 } from '../../domain/services/portal.service';
@@ -398,7 +400,7 @@ export const adminListIdeas = handlers.get(
   {
     name: 'Admin List Ideas',
     summary:
-      'Lists submitted ideas across all organizations (or one, via ?organization=) with submitter and NDA execution info',
+      'Lists submitted ideas across all organizations (or one, via ?organization=) with submitter and NDA execution info. PHI ships as at-rest ciphertext unless decrypt=true is passed explicitly',
     access: 'protected',
     auth: {
       jwt: {
@@ -406,7 +408,7 @@ export const adminListIdeas = handlers.get(
       },
       allowedRoles: new Set([ROLES.ADMIN])
     },
-    query: { organization: optional(string) },
+    query: { organization: optional(string), decrypt: optional(string) },
     responses: {
       200: AdminIdeasResponseSchema,
       400: string
@@ -420,7 +422,11 @@ export const adminListIdeas = handlers.get(
       // Each org is read through its own tenant-scoped service so row
       // filtering and per-tenant decryption keys apply per organization.
       const results = await Promise.all(
-        slugs.map((slug) => tenantScopedPortalService(slug).adminListIdeas())
+        slugs.map((slug) =>
+          tenantScopedPortalService(slug).adminListIdeas(
+            req.query.decrypt === 'true'
+          )
+        )
       );
       const ideas = results
         .flatMap((r) => r.ideas)
@@ -429,6 +435,58 @@ export const adminListIdeas = handlers.get(
     } catch (error) {
       if (error instanceof UnknownOrganizationError) {
         res.status(400).send(error.message);
+        return;
+      }
+      throw error;
+    }
+  }
+);
+
+export const adminScoreIdeaRoi = handlers.post(
+  schemaValidator,
+  '/ideas/:ideaId/roi-score',
+  {
+    name: 'Admin Score Idea ROI',
+    summary:
+      'AI-scores a submitted idea on the administrator ROI axes — length-of-stay reduction, throughput improvement, and patient satisfaction — and persists the result on the idea',
+    access: 'protected',
+    auth: {
+      jwt: {
+        jwksPublicKeyUrl: JWKS_PUBLIC_KEY_URL
+      },
+      allowedRoles: new Set([ROLES.ADMIN])
+    },
+    params: { ideaId: string },
+    query: { organization: string },
+    responses: {
+      200: RoiScoreResponseSchema,
+      400: string,
+      404: string,
+      502: string
+    }
+  },
+  async (req, res) => {
+    try {
+      // The idea's organization scopes tenant row filtering and the
+      // per-tenant decryption key, so it is required here.
+      res
+        .status(200)
+        .json(
+          await tenantScopedPortalService(
+            req.query.organization
+          ).adminScoreIdeaRoi(req.params.ideaId)
+        );
+    } catch (error) {
+      if (error instanceof UnknownOrganizationError) {
+        res.status(400).send(error.message);
+        return;
+      }
+      if (error instanceof IdeaNotFoundError) {
+        res.status(404).send(error.message);
+        return;
+      }
+      if (error instanceof EvaluationUnavailableError) {
+        res.status(502).send(error.message);
         return;
       }
       throw error;

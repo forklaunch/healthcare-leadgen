@@ -9,16 +9,16 @@ packages:
 - iam
 - innovations
 
-# pnpm 10 blocks dependency build scripts unless explicitly approved.
-# Approve the native/binary deps that genuinely need their install scripts;
-# ignore the rest (telemetry / optional postinstalls).
-onlyBuiltDependencies:
-- '@biomejs/biome'
-- cpu-features
-- esbuild
-- protobufjs
-- ssh2
-
-ignoredBuiltDependencies:
-- '@scarf/scarf'
-- tldjs
+# pnpm build-script approvals (read by pnpm 11; pnpm 10 uses package settings)
+allowBuilds:
+  '@biomejs/biome': true
+  cpu-features: true
+  esbuild: true
+  protobufjs: true
+  ssh2: true
+  '@scarf/scarf': true
+  tldjs: true
+  msgpackr-extract: true
+  sqlite3: true
+  better-sqlite3: true
+  unrs-resolver: true

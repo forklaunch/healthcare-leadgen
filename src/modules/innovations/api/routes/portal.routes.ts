@@ -2,6 +2,7 @@ import { forklaunchRouter, schemaValidator } from '@uchicago-ideas/core';
 import {
   acceptNda,
   adminListIdeas,
+  adminScoreIdeaRoi,
   evaluateIdea,
   getMe,
   refineIdea,
@@ -44,3 +45,7 @@ export const adminRouter = forklaunchRouter(
 );
 
 export const adminListIdeasRoute = adminRouter.get('/ideas', adminListIdeas);
+export const adminScoreIdeaRoiRoute = adminRouter.post(
+  '/ideas/:ideaId/roi-score',
+  adminScoreIdeaRoi
+);

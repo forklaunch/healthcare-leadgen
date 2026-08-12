@@ -592,3 +592,105 @@ ul.feedback li::marker { color: var(--accent); }
 }
 .modal h2 { margin-top: 0; }
 .modal .vault-value { font-size: 0.72rem; }
+
+/* ---- Admin ROI scoring ---- */
+.admin-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+.admin-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  margin: 0;
+}
+.admin-sort input { width: auto; margin: 0; }
+.portal-root button.secondary.small {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+}
+.roi-cell { min-width: 150px; }
+.roi-index {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.roi-index .score { font-size: 1.35rem; }
+.roi-minis { display: flex; flex-direction: column; gap: 0.1rem; margin: 0.3rem 0 0.45rem; }
+.roi-mini { font-size: 0.74rem; white-space: nowrap; }
+.roi-mini .score { font-size: 0.8rem; }
+.roi-detail-row td {
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+  border-top: none;
+}
+.roi-detail { padding: 0.4rem 0.2rem 0.6rem; }
+.roi-summary {
+  font-size: 0.95rem;
+  margin: 0.2rem 0 0.9rem;
+  max-width: 68ch;
+}
+.roi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.1rem;
+  margin-bottom: 0.8rem;
+}
+.roi-dimension {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  background: var(--card);
+}
+.roi-dimension .score-bar { margin: 0.45rem 0 0.55rem; }
+.roi-validate-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0.6rem 0 0.25rem;
+}
+.roi-validate {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.roi-validate li { margin-bottom: 0.3rem; }
+
+/* ---- Encrypted-first admin table + admin management ---- */
+.admin-tabs { margin-bottom: 1rem; }
+.admin-cipher {
+  display: inline-block;
+  max-width: 34ch;
+  overflow-wrap: anywhere;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.admin-body .admin-cipher { opacity: 0.65; }
+.admin-invite {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, #fff);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.admin-temp-pass {
+  font-size: 0.9rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}

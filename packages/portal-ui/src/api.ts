@@ -19,14 +19,65 @@ export interface ProfileMe {
   ideas: IdeaSummary[];
 }
 
-export interface AdminIdea extends IdeaSummary {
-  organizationId: string;
-  organizationName: string;
+export interface RoiDimension {
+  key: 'lengthOfStay' | 'throughput' | 'patientSatisfaction';
+  name: string;
+  score: number;
+  rationale: string;
+  validationSteps: string[];
+}
+
+export interface RoiScore {
+  summary: string;
+  roiIndex: number;
+  generatedBy: string;
+  scoredAt: string;
+  dimensions: RoiDimension[];
+}
+
+/** At-rest ciphertext for the PHI columns, exactly as stored in Postgres. */
+export interface AdminIdeaStored {
+  title: string;
+  body: string;
   doctorName: string;
   doctorEmail: string;
   doctorDepartment?: string;
+  roiScore?: string;
+}
+
+/**
+ * An idea as the admin API returns it: ciphertext always, plaintext fields
+ * only present when the listing was requested with decrypt=true.
+ */
+export interface AdminIdea {
+  id: string;
+  status: string;
+  submittedAt: string;
+  organizationId: string;
+  organizationName: string;
   ndaVersion?: string;
   ndaExecutedAt?: string;
+  stored: AdminIdeaStored;
+  title?: string;
+  body?: string;
+  doctorName?: string;
+  doctorEmail?: string;
+  doctorDepartment?: string;
+  roiScore?: RoiScore;
+}
+
+export interface AdminSummary {
+  email: string;
+  name: string;
+  role: string;
+  addedAt: string;
+}
+
+export interface AddAdminResult {
+  email: string;
+  name: string;
+  created: boolean;
+  temporaryPassword?: string;
 }
 
 export type EvaluationFocus =
@@ -212,6 +263,14 @@ export class AdminClient {
       body: JSON.stringify({ email, password })
     });
     if (!signIn.ok) throw new Error('Invalid email or password');
+    // Admin roles are surfaced from the active organization, so activate the
+    // shared ideas-program org before minting the JWT.
+    await fetch(`${this.iamUrl}/api/auth/organization/set-active`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ organizationSlug: 'ideas-program' })
+    });
     const tokenRes = await fetch(`${this.iamUrl}/api/auth/token`, {
       credentials: 'include'
     });
@@ -220,18 +279,75 @@ export class AdminClient {
     return token;
   }
 
+  /**
+   * Lists ideas. Without `decrypt`, PHI fields arrive as at-rest ciphertext
+   * only (`stored`); pass decrypt=true to include decrypted plaintext.
+   */
   async listIdeas(
     token: string,
-    organization?: string
+    organization?: string,
+    decrypt = false
   ): Promise<AdminIdea[]> {
-    const query = organization
-      ? `?organization=${encodeURIComponent(organization)}`
-      : '';
+    const params = new URLSearchParams();
+    if (organization) params.set('organization', organization);
+    if (decrypt) params.set('decrypt', 'true');
+    const query = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${this.apiUrl}/admin/ideas${query}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Not authorized to view ideas');
     const json = await res.json();
     return json.ideas;
+  }
+
+  async listAdmins(token: string): Promise<AdminSummary[]> {
+    const res = await fetch(`${this.iamUrl}/admins`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Not authorized to view the admin list');
+    return res.json();
+  }
+
+  async addAdmin(
+    token: string,
+    data: { email: string; name: string }
+  ): Promise<AddAdminResult> {
+    const res = await fetch(`${this.iamUrl}/admins`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Could not add administrator');
+    return res.json();
+  }
+
+  /**
+   * AI-scores one idea on the administrator ROI axes (length-of-stay
+   * reduction, throughput, patient satisfaction). The result is persisted
+   * server-side; re-scoring overwrites the previous score.
+   */
+  async scoreIdeaRoi(
+    token: string,
+    ideaId: string,
+    organizationId: string
+  ): Promise<RoiScore> {
+    const res = await fetch(
+      `${this.apiUrl}/admin/ideas/${encodeURIComponent(ideaId)}/roi-score?organization=${encodeURIComponent(organizationId)}`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    if (!res.ok) {
+      throw new Error(
+        res.status === 502
+          ? 'The AI scoring service is unavailable — try again shortly'
+          : 'ROI scoring failed'
+      );
+    }
+    return res.json();
   }
 }

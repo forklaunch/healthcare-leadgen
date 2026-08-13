@@ -197,6 +197,14 @@ export class PortalService {
       organizationId: this.organization.slug
     });
     await this.em.flush();
+    // Administrators fund against ROI, so every submission is scored on
+    // those axes in the background at submit time. Deliberately invisible
+    // to the submitter: fire-and-forget, response returns immediately, and
+    // a scoring failure never affects the submission (admins can re-score).
+    void this.scoreRoiInBackground(idea.id, {
+      title: data.title,
+      body: data.body
+    });
     return {
       id: idea.id,
       title: idea.title,
@@ -439,6 +447,33 @@ export class PortalService {
         };
       })
     };
+  };
+
+  /**
+   * Background ROI scoring for fresh submissions. Uses a forked
+   * EntityManager because the request-scoped one may already be disposed by
+   * the time the model responds; the tenant encryption context carries into
+   * this continuation from the request's async scope.
+   */
+  private scoreRoiInBackground = async (
+    ideaId: string,
+    data: { title: string; body: string }
+  ): Promise<void> => {
+    try {
+      const roiScore = await this.ideaEvaluationService.scoreRoi(data);
+      const em = this.em.fork();
+      const idea = await em.findOne(IdeaEntity, { id: ideaId });
+      if (!idea) return;
+      idea.roiScore = JSON.stringify(roiScore);
+      await em.flush();
+      this.openTelemetryCollector.info(
+        `[roi] background-scored idea ${ideaId} (roiIndex ${roiScore.roiIndex})`
+      );
+    } catch (error) {
+      this.openTelemetryCollector.error(
+        `[roi] background scoring failed for idea ${ideaId}: ${(error as Error).message}`
+      );
+    }
   };
 
   /**

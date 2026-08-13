@@ -8,6 +8,7 @@ import {
 } from './api';
 import { themeStyle, type AdminConfig } from './config';
 import { ScrambleText } from './scramble';
+import { AiThinking } from './thinking';
 
 function tier(score: number): 'high' | 'mid' | 'low' {
   if (score >= 70) return 'high';
@@ -54,7 +55,9 @@ export function AdminApp({ config }: { config: AdminConfig }) {
   const [scoring, setScoring] = useState<Set<string>>(new Set());
   const [sweeping, setSweeping] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedIdea, setExpandedIdea] = useState<string | null>(null);
   const [sortByRoi, setSortByRoi] = useState(false);
+  const [restoringSession, setRestoringSession] = useState(true);
   const [admins, setAdmins] = useState<AdminSummary[] | null>(null);
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -67,11 +70,30 @@ export function AdminApp({ config }: { config: AdminConfig }) {
     [config.apiUrl, config.iamUrl]
   );
 
+  // Refresh survival: the better-auth session cookie outlives both the page
+  // and the short-lived JWT, so re-mint a token from it on mount instead of
+  // bouncing back to the sign-in form.
+  useEffect(() => {
+    client
+      .restoreSession()
+      .then((restored) => {
+        if (restored) setToken(restored);
+      })
+      .finally(() => setRestoringSession(false));
+  }, [client]);
+
   useEffect(() => {
     if (token) {
       setIdeas(null);
       client
         .listIdeas(token, orgFilter || undefined, decrypted)
+        .catch(async (e) => {
+          // Expired JWT with a live session: silently re-mint and retry once.
+          const fresh = await client.restoreSession();
+          if (!fresh) throw e;
+          setToken(fresh);
+          return client.listIdeas(fresh, orgFilter || undefined, decrypted);
+        })
         .then((result) => {
           setIdeas(result);
           // The filter dropdown is built from the unfiltered listing so
@@ -243,7 +265,11 @@ export function AdminApp({ config }: { config: AdminConfig }) {
         </div>
       </header>
       <main>
-        {!token ? (
+        {!token && restoringSession ? (
+          <div className="card" style={{ maxWidth: 460, margin: '2rem auto' }}>
+            <p className="meta">Restoring your session…</p>
+          </div>
+        ) : !token ? (
           <div className="card" style={{ maxWidth: 460, margin: '2rem auto' }}>
             <h2>Administrator sign in</h2>
             <label>Email</label>
@@ -283,6 +309,18 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                 onClick={() => setTab('admins')}
               >
                 Administrators
+              </button>
+              <button
+                className="admin-signout"
+                onClick={async () => {
+                  await client.logout();
+                  setToken(null);
+                  setIdeas(null);
+                  setDecrypted(false);
+                  setAdmins(null);
+                }}
+              >
+                Sign out
               </button>
             </div>
 
@@ -363,6 +401,33 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                   )}
                 </p>
                 {error && <div className="error">{error}</div>}
+                {revealing && (
+                  <AiThinking
+                    label="Decrypting PHI"
+                    lines={[
+                      'Deriving the tenant key…',
+                      'Decrypting submissions…',
+                      'Almost there…'
+                    ]}
+                  />
+                )}
+                {(sweeping || scoring.size > 0) && (
+                  <AiThinking
+                    label={
+                      sweeping
+                        ? `Scoring ROI with AI (${scoring.size} in flight)`
+                        : 'Scoring ROI with AI'
+                    }
+                    lines={[
+                      'Reading the submission…',
+                      'Estimating length-of-stay impact…',
+                      'Estimating throughput impact…',
+                      'Estimating patient-satisfaction impact…',
+                      'Writing validation steps…',
+                      'Almost there…'
+                    ]}
+                  />
+                )}
                 {!visibleIdeas ? (
                   <p className="meta">Loading…</p>
                 ) : visibleIdeas.length === 0 ? (
@@ -384,26 +449,42 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                         const roi = idea.roiScore;
                         const isScoring = scoring.has(idea.id);
                         const isOpen = expanded === idea.id;
+                        const isIdeaOpen = expandedIdea === idea.id;
                         return [
                           <tr key={idea.id}>
                             <td>
-                              {decrypted && idea.title ? (
-                                <>
-                                  <strong>
-                                    <ScrambleText text={idea.title} />
-                                  </strong>
-                                  <div className="meta admin-body">
-                                    <ScrambleText text={idea.body ?? ''} />
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <Cipher value={idea.stored.title} />
-                                  <div className="admin-body">
-                                    <Cipher value={idea.stored.body} />
-                                  </div>
-                                </>
-                              )}
+                              <button
+                                className="idea-expand"
+                                onClick={() =>
+                                  setExpandedIdea(isIdeaOpen ? null : idea.id)
+                                }
+                                title={
+                                  isIdeaOpen
+                                    ? 'Collapse the full idea'
+                                    : 'Read the full idea'
+                                }
+                              >
+                                {decrypted && idea.title ? (
+                                  <>
+                                    <strong>
+                                      <ScrambleText text={idea.title} />
+                                    </strong>
+                                    <div className="meta admin-body">
+                                      <ScrambleText text={idea.body ?? ''} />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Cipher value={idea.stored.title} />
+                                    <div className="admin-body">
+                                      <Cipher value={idea.stored.body} />
+                                    </div>
+                                  </>
+                                )}
+                                <span className="meta idea-expand-hint">
+                                  {isIdeaOpen ? '▾ collapse' : '▸ read full idea'}
+                                </span>
+                              </button>
                             </td>
                             {!orgLocked && (
                               <td>
@@ -481,6 +562,39 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                             </td>
                             <td className="meta">{new Date(idea.submittedAt).toLocaleString()}</td>
                           </tr>,
+                          isIdeaOpen ? (
+                            <tr key={`${idea.id}-full`} className="idea-full-row">
+                              <td colSpan={colSpan}>
+                                {decrypted && idea.title ? (
+                                  <div className="idea-full">
+                                    <h3>{idea.title}</h3>
+                                    <p className="idea-full-body">{idea.body}</p>
+                                    <p className="meta">
+                                      Submitted by {idea.doctorName} (
+                                      {idea.doctorEmail}
+                                      {idea.doctorDepartment
+                                        ? ` · ${idea.doctorDepartment}`
+                                        : ''}
+                                      ) · {new Date(idea.submittedAt).toLocaleString()}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="idea-full">
+                                    <p className="meta">
+                                      Full at-rest ciphertext — decrypt PHI to
+                                      read the idea.
+                                    </p>
+                                    <p className="vault-value idea-full-cipher">
+                                      {idea.stored.title}
+                                    </p>
+                                    <p className="vault-value idea-full-cipher">
+                                      {idea.stored.body}
+                                    </p>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ) : null,
                           decrypted && roi && isOpen ? (
                             <tr key={`${idea.id}-roi`} className="roi-detail-row">
                               <td colSpan={colSpan}>

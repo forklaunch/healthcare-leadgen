@@ -280,6 +280,35 @@ export class AdminClient {
   }
 
   /**
+   * Re-mints a JWT from the better-auth session cookie, so a page refresh
+   * (or a short-lived token expiring) doesn't force a re-login while the
+   * session is still valid. Returns null when there is no live session.
+   */
+  async restoreSession(): Promise<string | null> {
+    try {
+      const res = await fetch(`${this.iamUrl}/api/auth/token`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return null;
+      const { token } = await res.json();
+      return token ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await fetch(`${this.iamUrl}/api/auth/sign-out`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch {
+      // best-effort; local state is cleared regardless
+    }
+  }
+
+  /**
    * Lists ideas. Without `decrypt`, PHI fields arrive as at-rest ciphertext
    * only (`stored`); pass decrypt=true to include decrypted plaintext.
    */

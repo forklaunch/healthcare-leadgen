@@ -9,6 +9,7 @@ import {
 } from './api';
 import { themeStyle, type PortalConfig } from './config';
 import { EncryptText, ScrambleText } from './scramble';
+import { AiThinking } from './thinking';
 
 type Tab = 'submit' | 'vault' | 'how';
 
@@ -511,6 +512,31 @@ function SubmitTab({
           </div>
         )}
         {error && <div className="error">{error}</div>}
+        {evaluating && (
+          <AiThinking
+            label="AI evaluation in progress"
+            lines={[
+              'Reading your draft…',
+              'Scoring study design…',
+              'Scoring commercialization potential…',
+              'Scoring operational speedup…',
+              'Writing actionable feedback…',
+              'Almost there…'
+            ]}
+          />
+        )}
+        {improving !== null && (
+          <AiThinking
+            label="Rewriting your draft"
+            lines={[
+              'Re-reading your draft…',
+              'Working through the evaluator feedback…',
+              'Strengthening the focus area…',
+              'Polishing the revision…',
+              'Almost there…'
+            ]}
+          />
+        )}
         <div className="btn-row">
           <button
             className="primary"

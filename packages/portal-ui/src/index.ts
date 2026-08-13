@@ -3,6 +3,7 @@ export { AdminApp } from './admin';
 export { PortalWithAdmin } from './root';
 export { EncryptionShowcase } from './showcase';
 export { ScrambleText, randomCipher } from './scramble';
+export { AiThinking } from './thinking';
 export { PortalClient, AdminClient } from './api';
 export type {
   AddAdminResult,

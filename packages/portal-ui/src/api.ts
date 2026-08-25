@@ -49,6 +49,15 @@ export interface BuildEstimate {
   };
   savingsPct: number;
   rationale: string;
+  /** Rate card + provenance, so the panel can show its work. */
+  assumptions?: {
+    agenticHourRateUsd: number;
+    devWeekRateUsd: number;
+    forklaunchMonthlyUsd: number;
+    estimatedByAi: string[];
+    fixed: string[];
+    basis: string;
+  };
 }
 
 export interface RoiScore {

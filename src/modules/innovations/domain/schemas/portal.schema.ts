@@ -144,7 +144,15 @@ export const BuildEstimateSchema = {
     firstYearUsd: number
   },
   savingsPct: number,
-  rationale: string
+  rationale: string,
+  assumptions: optional({
+    agenticHourRateUsd: number,
+    devWeekRateUsd: number,
+    forklaunchMonthlyUsd: number,
+    estimatedByAi: array(string),
+    fixed: array(string),
+    basis: string
+  })
 };
 
 export const RoiScoreResponseSchema = {

@@ -1094,3 +1094,39 @@ ul.feedback li::marker { color: var(--accent); }
 .build-table td .meta { display: block; font-size: 0.7rem; }
 .build-table .build-total { font-weight: 800; }
 .build-row-fl .build-total { color: var(--ok); }
+
+/* ---- Cost methodology disclosure ---- */
+.build-method { margin-top: 0.6rem; font-size: 0.8rem; }
+.build-method summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+.build-method summary:hover { text-decoration: underline; }
+.build-method-body {
+  margin-top: 0.6rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.build-math {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  margin: 0 0 0.7rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.build-math b { font-size: 0.8rem; margin-bottom: 0.1rem; }
+.build-math span { color: var(--muted); }
+.build-math .build-math-total {
+  color: inherit;
+  font-weight: 800;
+  border-top: 1px solid var(--line);
+  padding-top: 0.18rem;
+  margin-top: 0.12rem;
+}
+.build-method-body .meta { font-size: 0.74rem; line-height: 1.5; margin: 0.35rem 0 0; }

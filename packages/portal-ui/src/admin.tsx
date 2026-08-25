@@ -624,7 +624,10 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                         no build required
                                       </span>
                                     ) : (
-                                      <span className="build-inline">
+                                      <span
+                                        className="build-inline"
+                                        title={`ForkLaunch: ${roi.buildEstimate.forklaunch.agenticHours} agentic engineering hrs + $${roi.buildEstimate.forklaunch.monthlyUsd.toLocaleString()}/mo subscription. Custom: ${roi.buildEstimate.custom.devWeeks} dev-weeks + $${roi.buildEstimate.custom.monthlyUsd.toLocaleString()}/mo infrastructure and maintenance. Year one = build + 12 months. Open the row for the full calculation.`}
+                                      >
                                         <span className="build-inline-fl">
                                           ⚡ {money(roi.buildEstimate.forklaunch.buildCostUsd)}{' '}
                                           build + {money(roi.buildEstimate.forklaunch.monthlyUsd)}/mo
@@ -816,6 +819,72 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                           {roi.buildEstimate.savingsPct}% less in year one on ForkLaunch
                                         </p>
                                         <p className="meta">{roi.buildEstimate.rationale}</p>
+                                        <details className="build-method">
+                                          <summary>How these numbers were computed</summary>
+                                          <div className="build-method-body">
+                                            <p className="build-math">
+                                              <b>ForkLaunch</b>
+                                              <span>
+                                                {roi.buildEstimate.forklaunch.agenticHours} agentic
+                                                engineering hrs ×{' '}
+                                                {money(
+                                                  roi.buildEstimate.assumptions
+                                                    ?.agenticHourRateUsd ?? 200
+                                                )}
+                                                /hr = {money(roi.buildEstimate.forklaunch.buildCostUsd)}{' '}
+                                                build
+                                              </span>
+                                              <span>
+                                                platform subscription{' '}
+                                                {money(roi.buildEstimate.forklaunch.monthlyUsd)}/mo × 12
+                                                ={' '}
+                                                {money(roi.buildEstimate.forklaunch.monthlyUsd * 12)}
+                                              </span>
+                                              <span className="build-math-total">
+                                                year one ={' '}
+                                                {money(roi.buildEstimate.forklaunch.firstYearUsd)}
+                                              </span>
+                                            </p>
+                                            <p className="build-math">
+                                              <b>Custom build</b>
+                                              <span>
+                                                {roi.buildEstimate.custom.devWeeks} dev-weeks ×{' '}
+                                                {money(
+                                                  roi.buildEstimate.assumptions?.devWeekRateUsd ??
+                                                    12500
+                                                )}
+                                                /wk = {money(roi.buildEstimate.custom.buildCostUsd)}{' '}
+                                                build
+                                              </span>
+                                              <span>
+                                                infrastructure + maintenance{' '}
+                                                {money(roi.buildEstimate.custom.monthlyUsd)}/mo × 12 ={' '}
+                                                {money(roi.buildEstimate.custom.monthlyUsd * 12)}
+                                              </span>
+                                              <span className="build-math-total">
+                                                year one = {money(roi.buildEstimate.custom.firstYearUsd)}
+                                              </span>
+                                            </p>
+                                            {roi.buildEstimate.assumptions && (
+                                              <>
+                                                <p className="meta">
+                                                  <b>AI-estimated from the idea:</b>{' '}
+                                                  {roi.buildEstimate.assumptions.estimatedByAi.join(
+                                                    '; '
+                                                  )}
+                                                  .
+                                                </p>
+                                                <p className="meta">
+                                                  <b>Fixed rates:</b>{' '}
+                                                  {roi.buildEstimate.assumptions.fixed.join('; ')}.
+                                                </p>
+                                                <p className="meta">
+                                                  {roi.buildEstimate.assumptions.basis}
+                                                </p>
+                                              </>
+                                            )}
+                                          </div>
+                                        </details>
                                       </div>
                                     )}
                                   {roi.buildEstimate?.complexity === 'none' && (

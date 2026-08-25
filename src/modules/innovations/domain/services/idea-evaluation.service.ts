@@ -25,6 +25,25 @@ const DEV_WEEK_RATE_USD = 12_500;
 /** ForkLaunch platform subscription — fixed, not model-estimated. */
 const FORKLAUNCH_MONTHLY_USD = 1_000;
 
+/** Provenance shown with every estimate so the panel can show its work. */
+const BUILD_ASSUMPTIONS = {
+  agenticHourRateUsd: AGENTIC_HOUR_RATE_USD,
+  devWeekRateUsd: DEV_WEEK_RATE_USD,
+  forklaunchMonthlyUsd: FORKLAUNCH_MONTHLY_USD,
+  estimatedByAi: [
+    'agentic engineering hours to build on ForkLaunch',
+    'dev-weeks for an equivalent custom build',
+    'monthly infrastructure and maintenance for the custom build'
+  ],
+  fixed: [
+    `ForkLaunch subscription $${FORKLAUNCH_MONTHLY_USD.toLocaleString()}/mo`,
+    `agentic engineering $${AGENTIC_HOUR_RATE_USD}/hr`,
+    `custom engineering $${DEV_WEEK_RATE_USD.toLocaleString()}/dev-week blended`
+  ],
+  basis:
+    'Year one = build + 12 months of running cost. Effort is estimated by AI from the idea description; every dollar figure is derived from the rate card, not produced by the model. Triage guidance, not a quote.'
+} satisfies BuildEstimate['assumptions'];
+
 export interface RoiDimension {
   key: string;
   name: string;
@@ -61,6 +80,19 @@ export interface BuildEstimate {
   };
   savingsPct: number;
   rationale: string;
+  /**
+   * The rate card and provenance behind every figure above, so the panel
+   * can show its work instead of asserting a number.
+   */
+  assumptions: {
+    agenticHourRateUsd: number;
+    devWeekRateUsd: number;
+    forklaunchMonthlyUsd: number;
+    /** Which inputs the model estimated vs. which are fixed rate-card values. */
+    estimatedByAi: string[];
+    fixed: string[];
+    basis: string;
+  };
 }
 
 export interface RoiScore {
@@ -519,7 +551,8 @@ export class IdeaEvaluationService {
                 )
               )
             : 0,
-        rationale: be.rationale?.trim() || ''
+        rationale: be.rationale?.trim() || '',
+        assumptions: { ...BUILD_ASSUMPTIONS }
       };
     }
 
@@ -580,7 +613,8 @@ export class IdeaEvaluationService {
         },
         savingsPct: 95,
         rationale:
-          'Offline sample estimate — connect a Foundry endpoint for a real analysis.'
+          'Offline sample estimate — connect a Foundry endpoint for a real analysis.',
+        assumptions: { ...BUILD_ASSUMPTIONS }
       }
     };
   };

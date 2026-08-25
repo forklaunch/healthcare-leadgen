@@ -30,12 +30,23 @@ export interface RoiDimension {
 }
 
 /** Implementation cost comparison: building on ForkLaunch vs from scratch. */
+/** Build + run cost, both ways; firstYearUsd is build + 12 months. */
 export interface BuildEstimate {
   complexity: string;
-  /** AI-assisted build on scaffolded infra — measured in vibe-coding hours. */
-  forklaunch: { vibeHours: number; costUsd: number };
-  /** Traditional from-scratch build — measured in dev-weeks. */
-  custom: { devWeeks: number; costUsd: number };
+  /** Agentic engineering hours to build, on a flat platform subscription. */
+  forklaunch: {
+    agenticHours: number;
+    buildCostUsd: number;
+    monthlyUsd: number;
+    firstYearUsd: number;
+  };
+  /** Traditional build, plus the infrastructure and upkeep it carries. */
+  custom: {
+    devWeeks: number;
+    buildCostUsd: number;
+    monthlyUsd: number;
+    firstYearUsd: number;
+  };
   savingsPct: number;
   rationale: string;
 }

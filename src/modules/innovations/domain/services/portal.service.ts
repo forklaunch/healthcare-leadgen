@@ -508,8 +508,25 @@ function parseRoiScore(
   serialized: string | null | undefined
 ): RoiScore | undefined {
   if (!serialized) return undefined;
-  let parsed: RoiScore & {
-    buildEstimate?: { forklaunch?: { devWeeks?: number; vibeHours?: number } };
+  type LegacyCost = {
+    devWeeks?: number;
+    vibeHours?: number;
+    agenticHours?: number;
+    costUsd?: number;
+    buildCostUsd?: number;
+    monthlyUsd?: number;
+    firstYearUsd?: number;
+  };
+  // Parsed loosely: stored scores may predate fields the current type
+  // requires, and the block below fills them in before the value is used.
+  let parsed: Omit<RoiScore, 'buildEstimate'> & {
+    buildEstimate?: {
+      complexity?: string;
+      forklaunch?: LegacyCost;
+      custom?: LegacyCost;
+      savingsPct?: number;
+      rationale?: string;
+    };
   };
   try {
     parsed = JSON.parse(serialized);
@@ -517,10 +534,43 @@ function parseRoiScore(
     return undefined;
   }
 
-  const fl = parsed.buildEstimate?.forklaunch;
-  if (fl && typeof fl.vibeHours !== 'number') {
-    // Legacy: one dev-week of platform work ≈ 5 vibe-coding hours.
-    fl.vibeHours = Math.max(0, Math.round((fl.devWeeks ?? 0) * 5));
+  // Older scores predate the build+run cost model (and the rename from
+  // vibe-coding to agentic engineering hours). Fill the shape forward so
+  // historical ideas keep rendering; a re-score replaces it with real data.
+  const be = parsed.buildEstimate;
+  if (be) {
+    const fl = be.forklaunch ?? (be.forklaunch = {});
+    const cu = be.custom ?? (be.custom = {});
+    if (typeof fl.agenticHours !== 'number') {
+      fl.agenticHours =
+        typeof fl.vibeHours === 'number'
+          ? fl.vibeHours
+          : Math.max(0, Math.round((fl.devWeeks ?? 0) * 5));
+    }
+    if (typeof fl.buildCostUsd !== 'number') {
+      fl.buildCostUsd = fl.costUsd ?? fl.agenticHours * 200;
+    }
+    if (typeof fl.monthlyUsd !== 'number') {
+      fl.monthlyUsd = fl.buildCostUsd > 0 ? 1000 : 0;
+    }
+    if (typeof fl.firstYearUsd !== 'number') {
+      fl.firstYearUsd = fl.buildCostUsd + fl.monthlyUsd * 12;
+    }
+    if (typeof cu.buildCostUsd !== 'number') {
+      cu.buildCostUsd = cu.costUsd ?? (cu.devWeeks ?? 0) * 12_500;
+    }
+    if (typeof cu.monthlyUsd !== 'number') {
+      cu.monthlyUsd = cu.buildCostUsd > 0 ? 8_000 : 0;
+    }
+    if (typeof cu.firstYearUsd !== 'number') {
+      cu.firstYearUsd = cu.buildCostUsd + cu.monthlyUsd * 12;
+    }
+    if (cu.firstYearUsd > 0) {
+      be.savingsPct = Math.max(
+        0,
+        Math.min(100, Math.round((1 - fl.firstYearUsd / cu.firstYearUsd) * 100))
+      );
+    }
   }
 
   const dims = Array.isArray(parsed.dimensions) ? parsed.dimensions : [];
@@ -528,5 +578,5 @@ function parseRoiScore(
     if (!Array.isArray(d.strengths)) d.strengths = [];
     if (!Array.isArray(d.concerns)) d.concerns = [];
   }
-  return parsed;
+  return parsed as RoiScore;
 }

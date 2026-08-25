@@ -1047,3 +1047,50 @@ ul.feedback li::marker { color: var(--accent); }
 @media (max-width: 640px) {
   .wizard-meta, .wizard-stage { padding-inline: 1.1rem; }
 }
+
+/* ---- Build cost inline with ROI in the admin table ---- */
+.build-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.build-inline.none { font-style: italic; margin: 0.35rem 0 0.5rem; }
+.build-inline-fl { font-weight: 700; color: var(--ok); white-space: nowrap; }
+.build-inline-vs { white-space: nowrap; }
+.build-inline-save {
+  font-weight: 800;
+  color: var(--ok);
+  font-size: 0.7rem;
+}
+.roi-cell { min-width: 190px; }
+
+/* ---- Build + run cost table ---- */
+.build-table {
+  width: auto;
+  min-width: 24rem;
+  margin: 0.5rem 0 0.9rem;
+  font-size: 0.82rem;
+}
+.build-table th {
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: right;
+  padding: 0.2rem 0.7rem;
+}
+.build-table th:first-child { text-align: left; }
+.build-table td {
+  padding: 0.4rem 0.7rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--line);
+}
+.build-table td:first-child { text-align: left; }
+.build-table td .meta { display: block; font-size: 0.7rem; }
+.build-table .build-total { font-weight: 800; }
+.build-row-fl .build-total { color: var(--ok); }

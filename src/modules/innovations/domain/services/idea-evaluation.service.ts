@@ -20,8 +20,10 @@ export const ROI_DIMENSIONS = {
 export type RoiDimensionKey = keyof typeof ROI_DIMENSIONS;
 
 /** Rate card behind build estimates; keep in sync with the ROI prompt. */
-const VIBE_HOUR_RATE_USD = 200;
+const AGENTIC_HOUR_RATE_USD = 200;
 const DEV_WEEK_RATE_USD = 12_500;
+/** ForkLaunch platform subscription — fixed, not model-estimated. */
+const FORKLAUNCH_MONTHLY_USD = 1_000;
 
 export interface RoiDimension {
   key: string;
@@ -36,15 +38,27 @@ export interface RoiDimension {
 }
 
 /**
- * Implementation cost comparison. The ForkLaunch path is AI-assisted
- * ("vibe coding") on scaffolded infrastructure and is measured in hours;
- * the custom path is a traditional build measured in dev-weeks.
+ * Cost of standing the idea up as software, both ways, as build + run:
+ * ForkLaunch is a flat platform subscription plus agentic engineering
+ * hours to build; a custom build is a one-time engineering project plus
+ * the infrastructure and maintenance it carries forever after.
+ * `firstYearUsd` is build + 12 months, which is what gets compared.
  */
 export interface BuildEstimate {
   /** trivial | moderate | complex | very-complex | none */
   complexity: string;
-  forklaunch: { vibeHours: number; costUsd: number };
-  custom: { devWeeks: number; costUsd: number };
+  forklaunch: {
+    agenticHours: number;
+    buildCostUsd: number;
+    monthlyUsd: number;
+    firstYearUsd: number;
+  };
+  custom: {
+    devWeeks: number;
+    buildCostUsd: number;
+    monthlyUsd: number;
+    firstYearUsd: number;
+  };
   savingsPct: number;
   rationale: string;
 }
@@ -88,6 +102,8 @@ Rewrite the draft so it directly addresses every feedback item, with special dep
 - Add concrete specifics (measurable endpoints, cohort definitions, workflow steps, staffing/time estimates, market and regulatory pathway) framed as proposals and plans — never fabricate existing results, data, or approvals.
 - Keep it readable prose (short paragraphs or compact bullet lists), not a form.
 - The title may be sharpened but must stay recognizable.
+- Where the idea plausibly supports it, make the operational case explicit: the affected patient population and volume, the baseline metric and expected delta, bed-days or appointment slots freed, effect on length of stay / throughput / patient experience, and the staffing or workflow change required. Frame these as the physician's own proposed targets to validate, never as established results. Skip any of it that the idea genuinely does not support rather than inventing a stretch.
+- Do not mention administrators, funding criteria, or scoring rubrics anywhere in the rewritten draft or the change log; the change log should read as ordinary editorial improvements ("quantified the expected reduction", "named the affected unit and patient volume").
 
 Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
 {
@@ -110,9 +126,9 @@ For each axis give:
 - concerns: 1-3 bullets naming the gaps, risks, or unknowns that HELD THE SCORE DOWN (be specific — these explain the score to a skeptical administrator)
 - validationSteps: 2-4 concrete data pulls or measurements an administrator should run to validate the ROI before funding (e.g. "Pull average LOS for DRG 470 patients in the affected unit for the last 12 months")
 
-Also estimate the software implementation cost IF the idea requires building software (most workflow/digital ideas do). Compare two paths honestly — they are measured in DIFFERENT units because they are different kinds of work:
-- forklaunch: AI-assisted ("vibe coding") on the ForkLaunch platform. The CLI scaffolds the services; per-tenant PHI encryption, RLS, auth, deploys, observability, and shared-infrastructure hosting are inherited, not built. What remains is describing the domain logic to an AI coding agent and reviewing its output — measure this in HOURS (vibeHours). A typical CRUD/workflow app is 8-40 vibe hours; algorithmically novel systems more. Cost at $200/hour.
-- custom: a traditional from-scratch build on raw cloud primitives, including all the HIPAA-grade encryption, tenancy, auth, deploy pipeline, and monitoring work ForkLaunch would otherwise provide — measure in dev-weeks at $12,500/week blended.
+Also estimate the cost of standing this up as software IF the idea requires software (most workflow/digital ideas do). Both paths are build + run, but the work is different in kind:
+- forklaunch: built on the ForkLaunch platform by agentic engineering — the CLI scaffolds services, and per-tenant PHI encryption, RLS, auth, deploy pipeline, observability, and hosting are inherited rather than built. The remaining work is specifying domain logic to engineering agents and reviewing their output: estimate agenticHours (a typical CRUD/workflow app is 8-40 hours; algorithmically novel systems more). Running cost is a flat platform subscription that covers hosting and compliance infrastructure — do NOT estimate it, it is fixed and filled in for you.
+- custom: a traditional from-scratch build on raw cloud primitives, including all the HIPAA-grade encryption, tenancy, auth, deploy pipeline, and monitoring ForkLaunch would otherwise provide — estimate devWeeks at $12,500/week blended. Then estimate its monthlyUsd: cloud infrastructure PLUS the ongoing engineering to patch, monitor, and maintain a HIPAA-grade service (usually a meaningful fraction of an FTE). Be realistic — this is the cost that outlives the project.
 If the idea needs no software at all, set complexity "none" and zero the numbers.
 
 Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
@@ -125,9 +141,8 @@ Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
   ],
   "buildEstimate": {
     "complexity": "trivial|moderate|complex|very-complex|none",
-    "forklaunch": { "vibeHours": 0, "costUsd": 0 },
-    "custom": { "devWeeks": 0, "costUsd": 0 },
-    "savingsPct": 0,
+    "forklaunch": { "agenticHours": 0 },
+    "custom": { "devWeeks": 0, "monthlyUsd": 0 },
     "rationale": "1-2 sentences on what drives the estimate and the delta"
   }
 }`;
@@ -139,6 +154,8 @@ const SYSTEM_PROMPT = `You are an innovation evaluator for UChicago Medicine's p
 3. operationalSpeedup — Would this measurably speed up or improve operations in the physician's own unit? Consider workflow fit, time saved, staffing impact, and implementation lift.
 
 Scores are 0-100. Be a tough but fair grader: a vague one-liner should score low; a specific, feasible, differentiated idea scores high. Feedback must be concrete and actionable — things the physician can actually change in the next revision of their write-up, not generic advice.
+
+Ideas in this program are funded by hospital administrators, who evaluate on operational return: reduced inpatient length of stay, higher throughput with the same capacity, and better patient experience. Weave those considerations into your feedback so a stronger draft naturally makes its operational case — ask for the affected patient population and volume, the baseline metric and the expected delta, bed-days or slots freed, and the staffing/workflow change required. Fold this into the three lenses above (operationalSpeedup carries most of it) as ordinary "be more specific and quantify the impact" coaching. Do not mention administrators, funding criteria, or a separate scoring rubric — the physician should simply receive advice that makes their idea concrete and compelling.
 
 Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
 {
@@ -414,9 +431,8 @@ export class IdeaEvaluationService {
       }>;
       buildEstimate?: {
         complexity?: string;
-        forklaunch?: { vibeHours?: number; costUsd?: number };
-        custom?: { devWeeks?: number; costUsd?: number };
-        savingsPct?: number;
+        forklaunch?: { agenticHours?: number };
+        custom?: { devWeeks?: number; monthlyUsd?: number };
         rationale?: string;
       };
     };
@@ -460,26 +476,47 @@ export class IdeaEvaluationService {
     const be = parsed.buildEstimate;
     let buildEstimate: BuildEstimate | undefined;
     if (be) {
-      const vibeHours = Math.max(0, Math.round(be.forklaunch?.vibeHours ?? 0));
+      // The model estimates effort only; every dollar figure is derived from
+      // the rate card here. Models are unreliable at arithmetic, and the
+      // ForkLaunch subscription is a fixed price, not an opinion.
+      const agenticHours = Math.max(
+        0,
+        Math.round(be.forklaunch?.agenticHours ?? 0)
+      );
       const devWeeks = Math.max(0, Math.round(be.custom?.devWeeks ?? 0));
-      // Derive costs from the rate card when the model omits or fumbles them,
-      // then compute savings from the costs — models are unreliable at the
-      // arithmetic and an inconsistent headline number reads as sloppy.
-      const flCost = be.forklaunch?.costUsd
-        ? Math.max(0, Math.round(be.forklaunch.costUsd))
-        : vibeHours * VIBE_HOUR_RATE_USD;
-      const customCost = be.custom?.costUsd
-        ? Math.max(0, Math.round(be.custom.costUsd))
-        : devWeeks * DEV_WEEK_RATE_USD;
+      const none = be.complexity?.trim() === 'none';
+
+      const flBuild = agenticHours * AGENTIC_HOUR_RATE_USD;
+      const flMonthly = none ? 0 : FORKLAUNCH_MONTHLY_USD;
+      const customBuild = devWeeks * DEV_WEEK_RATE_USD;
+      const customMonthly = none
+        ? 0
+        : Math.max(0, Math.round(be.custom?.monthlyUsd ?? 0));
+      const flFirstYear = flBuild + flMonthly * 12;
+      const customFirstYear = customBuild + customMonthly * 12;
+
       buildEstimate = {
         complexity: be.complexity?.trim() || 'moderate',
-        forklaunch: { vibeHours, costUsd: flCost },
-        custom: { devWeeks, costUsd: customCost },
+        forklaunch: {
+          agenticHours,
+          buildCostUsd: flBuild,
+          monthlyUsd: flMonthly,
+          firstYearUsd: flFirstYear
+        },
+        custom: {
+          devWeeks,
+          buildCostUsd: customBuild,
+          monthlyUsd: customMonthly,
+          firstYearUsd: customFirstYear
+        },
         savingsPct:
-          customCost > 0
+          customFirstYear > 0
             ? Math.max(
                 0,
-                Math.min(100, Math.round((1 - flCost / customCost) * 100))
+                Math.min(
+                  100,
+                  Math.round((1 - flFirstYear / customFirstYear) * 100)
+                )
               )
             : 0,
         rationale: be.rationale?.trim() || ''
@@ -529,9 +566,19 @@ export class IdeaEvaluationService {
       dimensions,
       buildEstimate: {
         complexity: 'moderate',
-        forklaunch: { vibeHours: 24, costUsd: 4800 },
-        custom: { devWeeks: 22, costUsd: 275000 },
-        savingsPct: 98,
+        forklaunch: {
+          agenticHours: 24,
+          buildCostUsd: 4800,
+          monthlyUsd: FORKLAUNCH_MONTHLY_USD,
+          firstYearUsd: 4800 + FORKLAUNCH_MONTHLY_USD * 12
+        },
+        custom: {
+          devWeeks: 22,
+          buildCostUsd: 275000,
+          monthlyUsd: 8000,
+          firstYearUsd: 275000 + 8000 * 12
+        },
+        savingsPct: 95,
         rationale:
           'Offline sample estimate — connect a Foundry endpoint for a real analysis.'
       }

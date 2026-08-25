@@ -131,8 +131,18 @@ export const RoiDimensionSchema = {
 
 export const BuildEstimateSchema = {
   complexity: string,
-  forklaunch: { vibeHours: number, costUsd: number },
-  custom: { devWeeks: number, costUsd: number },
+  forklaunch: {
+    agenticHours: number,
+    buildCostUsd: number,
+    monthlyUsd: number,
+    firstYearUsd: number
+  },
+  custom: {
+    devWeeks: number,
+    buildCostUsd: number,
+    monthlyUsd: number,
+    firstYearUsd: number
+  },
   savingsPct: number,
   rationale: string
 };

@@ -514,7 +514,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                         {!orgLocked && <th>Organization</th>}
                         <th>Submitted by</th>
                         <th>NDA</th>
-                        <th>ROI</th>
+                        <th>ROI &amp; build cost</th>
                         <th>Submitted</th>
                       </tr>
                     </thead>
@@ -616,6 +616,30 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                       </span>
                                     ))}
                                   </div>
+                                  {/* Cost sits with the return: an ROI number
+                                      is only fundable next to what it costs. */}
+                                  {roi.buildEstimate &&
+                                    (roi.buildEstimate.complexity === 'none' ? (
+                                      <span className="meta build-inline none">
+                                        no build required
+                                      </span>
+                                    ) : (
+                                      <span className="build-inline">
+                                        <span className="build-inline-fl">
+                                          ⚡ {money(roi.buildEstimate.forklaunch.buildCostUsd)}{' '}
+                                          build + {money(roi.buildEstimate.forklaunch.monthlyUsd)}/mo
+                                        </span>
+                                        <span className="meta build-inline-vs">
+                                          vs {money(roi.buildEstimate.custom.buildCostUsd)} +{' '}
+                                          {money(roi.buildEstimate.custom.monthlyUsd)}/mo custom
+                                        </span>
+                                        <span className="build-inline-save">
+                                          {money(roi.buildEstimate.forklaunch.firstYearUsd)} vs{' '}
+                                          {money(roi.buildEstimate.custom.firstYearUsd)} yr 1 ·{' '}
+                                          {roi.buildEstimate.savingsPct}% less
+                                        </span>
+                                      </span>
+                                    ))}
                                   <button
                                     className="secondary small"
                                     disabled={isScoring || sweeping}
@@ -722,40 +746,74 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                     roi.buildEstimate.complexity !== 'none' && (
                                       <div className="build-estimate">
                                         <p className="roi-validate-label">
-                                          Implementation cost — built on ForkLaunch vs custom
+                                          Cost to build and run — ForkLaunch vs custom
                                           <span className="badge gold">
                                             {roi.buildEstimate.complexity}
                                           </span>
                                         </p>
+                                        <table className="build-table">
+                                          <thead>
+                                            <tr>
+                                              <th />
+                                              <th>Build</th>
+                                              <th>Monthly</th>
+                                              <th>Year one</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr className="build-row-fl">
+                                              <td>
+                                                <strong>ForkLaunch</strong>
+                                                <span className="meta">
+                                                  {roi.buildEstimate.forklaunch.agenticHours} agentic
+                                                  engineering hrs
+                                                </span>
+                                              </td>
+                                              <td>{money(roi.buildEstimate.forklaunch.buildCostUsd)}</td>
+                                              <td>{money(roi.buildEstimate.forklaunch.monthlyUsd)}</td>
+                                              <td className="build-total">
+                                                {money(roi.buildEstimate.forklaunch.firstYearUsd)}
+                                              </td>
+                                            </tr>
+                                            <tr>
+                                              <td>
+                                                <strong>Custom build</strong>
+                                                <span className="meta">
+                                                  {roi.buildEstimate.custom.devWeeks} dev-weeks + infra
+                                                  &amp; upkeep
+                                                </span>
+                                              </td>
+                                              <td>{money(roi.buildEstimate.custom.buildCostUsd)}</td>
+                                              <td>{money(roi.buildEstimate.custom.monthlyUsd)}</td>
+                                              <td className="build-total">
+                                                {money(roi.buildEstimate.custom.firstYearUsd)}
+                                              </td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
                                         <div className="build-bars">
                                           <div className="build-bar-row">
-                                            <span className="build-bar-name">ForkLaunch + AI</span>
+                                            <span className="build-bar-name">ForkLaunch</span>
                                             <div className="build-bar">
                                               <div
                                                 className="build-bar-fill fl"
                                                 style={{
-                                                  width: `${Math.max(4, Math.round((roi.buildEstimate.forklaunch.costUsd / Math.max(1, roi.buildEstimate.custom.costUsd)) * 100))}%`
+                                                  width: `${Math.max(3, Math.round((roi.buildEstimate.forklaunch.firstYearUsd / Math.max(1, roi.buildEstimate.custom.firstYearUsd)) * 100))}%`
                                                 }}
                                               />
                                             </div>
-                                            <span className="build-bar-value">
-                                              {money(roi.buildEstimate.forklaunch.costUsd)} ·{' '}
-                                              {roi.buildEstimate.forklaunch.vibeHours} vibe-coding hrs
-                                            </span>
+                                            <span className="build-bar-value">year one</span>
                                           </div>
                                           <div className="build-bar-row">
-                                            <span className="build-bar-name">Custom build</span>
+                                            <span className="build-bar-name">Custom</span>
                                             <div className="build-bar">
                                               <div className="build-bar-fill custom" style={{ width: '100%' }} />
                                             </div>
-                                            <span className="build-bar-value">
-                                              {money(roi.buildEstimate.custom.costUsd)} ·{' '}
-                                              {roi.buildEstimate.custom.devWeeks} wk
-                                            </span>
+                                            <span className="build-bar-value">year one</span>
                                           </div>
                                         </div>
                                         <p className="build-savings">
-                                          {roi.buildEstimate.savingsPct}% less on ForkLaunch
+                                          {roi.buildEstimate.savingsPct}% less in year one on ForkLaunch
                                         </p>
                                         <p className="meta">{roi.buildEstimate.rationale}</p>
                                       </div>

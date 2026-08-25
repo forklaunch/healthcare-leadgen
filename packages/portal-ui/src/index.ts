@@ -1,6 +1,7 @@
 export { PortalApp } from './portal';
 export { AdminApp } from './admin';
 export { PortalWithAdmin } from './root';
+export { SubmitWizard } from './submit-wizard';
 export { EncryptionShowcase } from './showcase';
 export { ScrambleText, randomCipher } from './scramble';
 export { AiThinking } from './thinking';

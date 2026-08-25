@@ -10,8 +10,8 @@ import {
 import { themeStyle, type PortalConfig } from './config';
 import { EncryptText, ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
-import { DOCTOR_STEPS, GuidedSteps, NextAction } from './guided';
-import { useGuidedFocus } from './focus';
+import { DOCTOR_STEPS, GuidedSteps } from './guided';
+import { SubmitWizard } from './submit-wizard';
 
 type Tab = 'submit' | 'vault' | 'how';
 
@@ -321,23 +321,10 @@ function SubmitTab({
   refreshMe: () => void;
   onOpenVault: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
+  // The wizard owns the draft/evaluation state; this tab only handles the
+  // access + NDA gates and the sealed-proof modal it raises.
   const [flash, setFlash] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [evaluation, setEvaluation] = useState<IdeaEvaluation | null>(null);
-  const [prevScores, setPrevScores] = useState<Record<string, number> | null>(null);
-  const [focus, setFocus] = useState<EvaluationFocus | null>(null);
-  const [evaluating, setEvaluating] = useState(false);
-  const [improving, setImproving] = useState<EvaluationFocus | null>(null);
-  const [changes, setChanges] = useState<string[] | null>(null);
-  const [evaluatedDraft, setEvaluatedDraft] = useState<{ title: string; body: string } | null>(null);
   const [sealedSection, setSealedSection] = useState<StorageSection | null>(null);
-  // Scrolls the evaluation results into view whenever a new one arrives.
-  const { focusRef, scrollToFocus } = useGuidedFocus(
-    evaluation ? `${evaluation.generatedBy}:${evaluation.dimensions.map((d) => d.score).join('-')}` : null
-  );
 
   if (!accessKey || !me) {
     return (
@@ -382,126 +369,6 @@ function SubmitTab({
     );
   }
 
-  const runEvaluation = async (focusKey: EvaluationFocus | null) => {
-    setEvaluating(true);
-    setError(null);
-    try {
-      const result = await client.evaluateIdea(accessKey, {
-        title,
-        body,
-        focus: focusKey ?? undefined
-      });
-      setPrevScores(
-        evaluation
-          ? Object.fromEntries(evaluation.dimensions.map((d) => [d.key, d.score]))
-          : null
-      );
-      setEvaluation(result);
-      setEvaluatedDraft({ title, body });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Evaluation failed');
-    } finally {
-      setEvaluating(false);
-    }
-  };
-
-  /**
-   * Focus on a dimension: the AI rewrites the draft to address that
-   * dimension's feedback, the box updates, and the draft is re-scored.
-   * Retries once if the focused score didn't improve.
-   */
-  const focusAndImprove = async (dimKey: EvaluationFocus) => {
-    if (!evaluation) return;
-    setFocus(dimKey);
-    setImproving(dimKey);
-    setError(null);
-    const baseline = Object.fromEntries(
-      evaluation.dimensions.map((d) => [d.key, d.score])
-    );
-    try {
-      let draft = { title, body };
-      let currentEval = evaluation;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const dim = currentEval.dimensions.find((d) => d.key === dimKey);
-        if (!dim) break;
-        const refined = await client.refineIdea(accessKey, {
-          ...draft,
-          focus: dimKey,
-          feedback: [dim.summary, ...dim.actionableFeedback]
-        });
-        draft = { title: refined.title, body: refined.body };
-        setTitle(refined.title);
-        setBody(refined.body);
-        setChanges(refined.changes);
-        const newEval = await client.evaluateIdea(accessKey, {
-          ...draft,
-          focus: dimKey
-        });
-        setPrevScores(baseline);
-        setEvaluation(newEval);
-        setEvaluatedDraft(draft);
-        const newScore =
-          newEval.dimensions.find((d) => d.key === dimKey)?.score ?? 0;
-        if (newScore > baseline[dimKey]) break;
-        currentEval = newEval;
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Draft improvement failed');
-    } finally {
-      setImproving(null);
-    }
-  };
-
-  const submitIdea = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await client.submitIdea(accessKey, { title, body });
-      setTitle('');
-      setBody('');
-      setEvaluation(null);
-      setPrevScores(null);
-      setFocus(null);
-      setChanges(null);
-      setEvaluatedDraft(null);
-      refreshMe();
-      // The proof moment: read the just-written row back, sealed
-      const inspector = await client.getStorageInspector(accessKey, false);
-      const ideaSection = inspector?.sections.find((s) => s.table === 'idea');
-      if (ideaSection) setSealedSection(ideaSection);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submission failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const aiBusy = evaluating || improving !== null;
-
-  const draftStale =
-    evaluation !== null &&
-    evaluatedDraft !== null &&
-    (evaluatedDraft.title !== title || evaluatedDraft.body !== body);
-
-  // Where the doctor is in the guided journey (drives the stepper).
-  const guidedStep = sealedSection
-    ? 5
-    : busy
-      ? 4
-      : evaluation
-        ? 3
-        : evaluating
-          ? 2
-          : 1;
-  const weakest = evaluation
-    ? [...evaluation.dimensions].sort((a, b) => a.score - b.score)[0]
-    : null;
-  const guidedHint = !evaluation
-    ? 'Start with a rough draft — the AI evaluation will tell you exactly what to sharpen.'
-    : weakest && weakest.score < 70
-      ? `Your weakest lens is ${weakest.name} (${weakest.score}/100) — one click below rewrites the draft to strengthen it, or submit as-is.`
-      : 'Strong across all three lenses — submit when you’re ready.';
-
   return (
     <>
       {sealedSection && (
@@ -516,221 +383,15 @@ function SubmitTab({
           }}
         />
       )}
-      <div className="card">
-        <h2>
-          Submit an idea
-          <span className="badge ok">NDA executed ({me.acceptedNdaVersion})</span>
-        </h2>
-        <GuidedSteps steps={DOCTOR_STEPS} current={guidedStep} />
-        <p className="meta guided-hint">{guidedHint}</p>
-        {(() => {
-          // One button for whatever should happen next, so the flow never
-          // depends on the user picking the right control.
-          const ready = Boolean(title && body);
-          if (!evaluation) {
-            return (
-              <NextAction
-                label="Get AI evaluation"
-                hint={
-                  ready
-                    ? 'Score this draft through all three lenses'
-                    : 'Add a title and description to continue'
-                }
-                disabled={!ready || aiBusy || busy}
-                busy={evaluating}
-                onClick={() => void runEvaluation(focus)}
-              />
-            );
-          }
-          if (draftStale) {
-            return (
-              <NextAction
-                label="Re-evaluate"
-                hint="Your draft changed — refresh the scores"
-                disabled={!ready || aiBusy || busy}
-                busy={evaluating}
-                onClick={() => void runEvaluation(focus)}
-              />
-            );
-          }
-          if (weakest && weakest.score < 70) {
-            return (
-              <NextAction
-                label={`Strengthen ${weakest.name}`}
-                hint={`AI rewrites your draft to raise its weakest lens (${weakest.score}/100)`}
-                disabled={aiBusy || busy}
-                busy={improving !== null}
-                onClick={() =>
-                  void focusAndImprove(weakest.key as EvaluationFocus)
-                }
-              />
-            );
-          }
-          return (
-            <NextAction
-              label="Submit idea"
-              hint="Strong across all three lenses — seal and send it"
-              disabled={!ready || aiBusy || busy}
-              busy={busy}
-              onClick={() => void submitIdea()}
-            />
-          );
-        })()}
-        <label>Title</label>
-        <input
-          className="submit-title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="One-line summary"
-        />
-        <label>Describe your idea</label>
-        <textarea
-          className="submit-body"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="What problem does it solve? Who benefits? Include clinical context as needed — submissions are stored under PHI safeguards."
-        />
-        <p className="meta" style={{ marginTop: '0.9rem' }}>
-          🛡️ AI evaluation runs under Microsoft's Azure BAA — encrypted in
-          transit, never used for training. Nothing is stored until you press
-          Submit, and everything stored is{' '}
-          <a
-            href="#vault"
-            onClick={(e) => {
-              e.preventDefault();
-              onOpenVault();
-            }}
-          >
-            sealed in your encrypted record
-          </a>
-          .
-        </p>
-        {changes && changes.length > 0 && (
-          <div className="notice" style={{ marginTop: '1rem' }}>
-            <strong>The AI revised your draft.</strong> Review and edit it
-            freely — it's still your idea. What changed:
-            <ul className="feedback" style={{ marginBottom: 0 }}>
-              {changes.map((c, i) => (
-                <li key={i}>{c}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {error && <div className="error">{error}</div>}
-        {evaluating && (
-          <AiThinking
-            label="AI evaluation in progress"
-            lines={[
-              'Reading your draft…',
-              'Scoring study design…',
-              'Scoring commercialization potential…',
-              'Scoring operational speedup…',
-              'Writing actionable feedback…',
-              'Almost there…'
-            ]}
-          />
-        )}
-        {improving !== null && (
-          <AiThinking
-            label="Rewriting your draft"
-            lines={[
-              'Re-reading your draft…',
-              'Working through the evaluator feedback…',
-              'Strengthening the focus area…',
-              'Polishing the revision…',
-              'Almost there…'
-            ]}
-          />
-        )}
-        <div className="btn-row">
-          <button
-            className="primary"
-            disabled={aiBusy || busy || !title || !body}
-            onClick={() => void runEvaluation(focus)}
-          >
-            {evaluating
-              ? 'Evaluating…'
-              : evaluation
-                ? 'Re-evaluate with AI'
-                : 'Get AI evaluation'}
-          </button>
-          <button
-            className={evaluation ? 'primary' : 'secondary'}
-            disabled={busy || aiBusy || !title || !body}
-            onClick={() => void submitIdea()}
-          >
-            Submit idea
-          </button>
-        </div>
-      </div>
-      {evaluation && (
-        <div className="card" ref={focusRef}>
-          <h2>
-            AI evaluation
-            <span className="badge">{evaluation.generatedBy}</span>
-            <span className="badge ok">BAA-covered</span>
-          </h2>
-          <p>{evaluation.summary}</p>
-          {draftStale && (
-            <p className="notice warn">
-              You've edited your draft since this evaluation — re-evaluate to
-              refresh the scores.
-            </p>
-          )}
-          <div className="eval-grid">
-            {evaluation.dimensions.map((dim) => {
-              const prev = prevScores?.[dim.key];
-              const delta = prev !== undefined ? dim.score - prev : null;
-              const focused = focus === dim.key;
-              return (
-                <div key={dim.key} className={`eval-card${focused ? ' focused' : ''}`}>
-                  <h3>{dim.name}</h3>
-                  <div className="score-row">
-                    <span className={`score ${scoreClass(dim.score)}`}>{dim.score}</span>
-                    <span className="meta">/ 100</span>
-                    {delta !== null && delta !== 0 && (
-                      <span className={`delta ${delta > 0 ? 'up' : 'down'}`}>
-                        {delta > 0 ? `▲ +${delta}` : `▼ ${delta}`}
-                      </span>
-                    )}
-                  </div>
-                  <div className="score-bar">
-                    <div
-                      className={`score-bar-fill ${scoreClass(dim.score)}`}
-                      style={{ width: `${dim.score}%` }}
-                    />
-                  </div>
-                  <p className="meta">{dim.summary}</p>
-                  {dim.actionableFeedback.length > 0 && (
-                    <ul className="feedback">
-                      {dim.actionableFeedback.map((f, i) => (
-                        <li key={i}>{f}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    className={focused ? 'primary' : 'secondary'}
-                    disabled={aiBusy}
-                    onClick={() => void focusAndImprove(dim.key)}
-                  >
-                    {improving === dim.key
-                      ? 'Improving your draft…'
-                      : focused
-                        ? 'Improve again'
-                        : 'Focus on this'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <p className="meta" style={{ marginTop: '1rem' }}>
-            Pick a dimension to focus on and the AI will rewrite your draft to
-            address that dimension's feedback and raise its score. Review the
-            revision, edit as you like, and repeat until you're satisfied —
-            then submit.
-          </p>
-        </div>
-      )}
+      <SubmitWizard
+        client={client}
+        config={config}
+        accessKey={accessKey}
+        me={me}
+        refreshMe={refreshMe}
+        onSealed={setSealedSection}
+        onOpenVault={onOpenVault}
+      />
       <div className="card">
         <h2>Your submissions</h2>
         {me.ideas.length === 0 ? (

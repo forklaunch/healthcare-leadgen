@@ -1048,24 +1048,61 @@ ul.feedback li::marker { color: var(--accent); }
   .wizard-meta, .wizard-stage { padding-inline: 1.1rem; }
 }
 
-/* ---- Build cost inline with ROI in the admin table ---- */
-.build-inline {
+/* ---- ROI + cost breakdown in the admin table cell ---- */
+.roi-cell { min-width: 232px; }
+.roi-breakdown, .cost-breakdown { margin: 0; }
+.roi-breakdown-row, .cost-row, .cost-head {
   display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  margin: 0.35rem 0 0.5rem;
-  font-size: 0.72rem;
-  line-height: 1.35;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
 }
-.build-inline.none { font-style: italic; margin: 0.35rem 0 0.5rem; }
-.build-inline-fl { font-weight: 700; color: var(--ok); white-space: nowrap; }
-.build-inline-vs { white-space: nowrap; }
-.build-inline-save {
+.roi-breakdown-row dt, .cost-row dt, .cost-head dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.roi-breakdown-row dd, .cost-row dd, .cost-head dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.roi-breakdown { margin: 0.3rem 0 0.5rem; }
+.roi-breakdown-row dd.score { font-size: 0.86rem; font-weight: 800; }
+
+.cost-breakdown {
+  margin: 0.1rem 0 0.55rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+}
+.cost-head {
+  margin-bottom: 0.15rem;
+}
+.cost-head dt {
+  font-size: 0.64rem;
   font-weight: 800;
-  color: var(--ok);
-  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
-.roi-cell { min-width: 190px; }
+.cost-head dd { font-size: 0.68rem; font-style: italic; }
+.cost-row.fl dd { color: var(--ok); font-weight: 700; }
+.cost-row.total {
+  border-top: 1px solid var(--line);
+  margin-top: 0.2rem;
+  padding-top: 0.2rem;
+}
+.cost-row.total .cost-fl { color: var(--ok); }
+.cost-row.save dt, .cost-row.save dd { color: var(--ok); font-weight: 800; }
+.build-none {
+  margin: 0.3rem 0 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  font-style: italic;
+}
 
 /* ---- Build + run cost table ---- */
 .build-table {

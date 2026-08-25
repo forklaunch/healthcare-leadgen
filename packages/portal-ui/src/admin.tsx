@@ -608,40 +608,66 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                     </span>
                                     <span className="meta">/100 {isOpen ? '▾' : '▸'}</span>
                                   </button>
-                                  <div className="roi-minis">
+                                  <dl className="roi-breakdown">
                                     {roi.dimensions.map((d) => (
-                                      <span key={d.key} className="meta roi-mini">
-                                        {ROI_AXIS_SHORT[d.key] ?? d.name}{' '}
-                                        <b className={`score ${tier(d.score)}`}>{d.score}</b>
-                                      </span>
+                                      <div key={d.key} className="roi-breakdown-row">
+                                        <dt>{ROI_AXIS_SHORT[d.key] ?? d.name}</dt>
+                                        <dd className={`score ${tier(d.score)}`}>{d.score}</dd>
+                                      </div>
                                     ))}
-                                  </div>
+                                  </dl>
                                   {/* Cost sits with the return: an ROI number
-                                      is only fundable next to what it costs. */}
+                                      is only fundable next to what it costs.
+                                      The rate card behind these figures is in
+                                      the expanded panel. */}
                                   {roi.buildEstimate &&
                                     (roi.buildEstimate.complexity === 'none' ? (
-                                      <span className="meta build-inline none">
-                                        no build required
-                                      </span>
+                                      <p className="meta build-none">
+                                        No software build required
+                                      </p>
                                     ) : (
-                                      <span
-                                        className="build-inline"
-                                        title={`ForkLaunch: ${roi.buildEstimate.forklaunch.agenticHours} agentic engineering hrs + $${roi.buildEstimate.forklaunch.monthlyUsd.toLocaleString()}/mo subscription. Custom: ${roi.buildEstimate.custom.devWeeks} dev-weeks + $${roi.buildEstimate.custom.monthlyUsd.toLocaleString()}/mo infrastructure and maintenance. Year one = build + 12 months. Open the row for the full calculation.`}
-                                      >
-                                        <span className="build-inline-fl">
-                                          ⚡ {money(roi.buildEstimate.forklaunch.buildCostUsd)}{' '}
-                                          build + {money(roi.buildEstimate.forklaunch.monthlyUsd)}/mo
-                                        </span>
-                                        <span className="meta build-inline-vs">
-                                          vs {money(roi.buildEstimate.custom.buildCostUsd)} +{' '}
-                                          {money(roi.buildEstimate.custom.monthlyUsd)}/mo custom
-                                        </span>
-                                        <span className="build-inline-save">
-                                          {money(roi.buildEstimate.forklaunch.firstYearUsd)} vs{' '}
-                                          {money(roi.buildEstimate.custom.firstYearUsd)} yr 1 ·{' '}
-                                          {roi.buildEstimate.savingsPct}% less
-                                        </span>
-                                      </span>
+                                      <dl className="cost-breakdown">
+                                        <div className="cost-head">
+                                          <dt>Build + run</dt>
+                                          <dd className="meta">{roi.buildEstimate.complexity}</dd>
+                                        </div>
+                                        <div className="cost-row fl">
+                                          <dt>ForkLaunch</dt>
+                                          <dd>
+                                            {money(roi.buildEstimate.forklaunch.buildCostUsd)}
+                                            <span className="meta">
+                                              {' '}
+                                              + {money(roi.buildEstimate.forklaunch.monthlyUsd)}/mo
+                                            </span>
+                                          </dd>
+                                        </div>
+                                        <div className="cost-row">
+                                          <dt>Custom</dt>
+                                          <dd>
+                                            {money(roi.buildEstimate.custom.buildCostUsd)}
+                                            <span className="meta">
+                                              {' '}
+                                              + {money(roi.buildEstimate.custom.monthlyUsd)}/mo
+                                            </span>
+                                          </dd>
+                                        </div>
+                                        <div className="cost-row total">
+                                          <dt>Year one</dt>
+                                          <dd>
+                                            <b className="cost-fl">
+                                              {money(roi.buildEstimate.forklaunch.firstYearUsd)}
+                                            </b>
+                                            <span className="meta">
+                                              {' '}
+                                              vs {money(roi.buildEstimate.custom.firstYearUsd)}
+                                            </span>
+                                          </dd>
+                                        </div>
+                                        <div className="cost-row save">
+                                          <dt>Saves</dt>
+                                          <dd>{roi.buildEstimate.savingsPct}%</dd>
+                                        </div>
+                                      </dl>
                                     ))}
                                   <button
                                     className="secondary small"

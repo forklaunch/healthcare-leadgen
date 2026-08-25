@@ -9,7 +9,8 @@ import {
 import { themeStyle, type AdminConfig } from './config';
 import { ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
-import { ADMIN_STEPS, GuidedSteps } from './guided';
+import { ADMIN_STEPS, GuidedSteps, NextAction } from './guided';
+import { useGuidedFocus } from './focus';
 
 const money = (n: number) =>
   n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
@@ -68,6 +69,9 @@ export function AdminApp({ config }: { config: AdminConfig }) {
   const [addResult, setAddResult] = useState<AddAdminResult | null>(null);
 
   const orgLocked = Boolean(config.organization);
+  // Scrolls the opened ROI breakdown into view when a row is expanded or a
+  // fresh score lands.
+  const { focusRef } = useGuidedFocus(expanded);
 
   const client = useMemo(
     () => new AdminClient(config.apiUrl, config.iamUrl),
@@ -345,6 +349,57 @@ export function AdminApp({ config }: { config: AdminConfig }) {
             {tab === 'ideas' ? (
               <div className="card">
                 {token && <GuidedSteps steps={ADMIN_STEPS} current={adminStep} />}
+                {token &&
+                  (() => {
+                    // Same idea as the doctor view: surface the one action
+                    // that moves the review forward from here.
+                    const hasIdeas = (ideas?.length ?? 0) > 0;
+                    if (!decrypted) {
+                      return (
+                        <NextAction
+                          label="🔓 Decrypt PHI"
+                          hint={
+                            hasIdeas
+                              ? 'Unseal submissions with the tenant key to review and score them'
+                              : 'No submissions to review yet'
+                          }
+                          disabled={!hasIdeas || revealing}
+                          busy={revealing}
+                          onClick={() => void decryptPhi()}
+                        />
+                      );
+                    }
+                    if (unscoredCount > 0) {
+                      return (
+                        <NextAction
+                          label={`Score ${unscoredCount} unscored`}
+                          hint="AI-scores each idea on length of stay, throughput, and patient satisfaction"
+                          disabled={sweeping}
+                          busy={sweeping}
+                          onClick={() => void scoreAllUnscored()}
+                        />
+                      );
+                    }
+                    const top = [...(ideas ?? [])]
+                      .filter((i) => i.roiScore)
+                      .sort(
+                        (a, b) =>
+                          (b.roiScore?.roiIndex ?? 0) - (a.roiScore?.roiIndex ?? 0)
+                      )[0];
+                    if (top && expanded !== top.id) {
+                      return (
+                        <NextAction
+                          label={`Review top idea (ROI ${top.roiScore?.roiIndex})`}
+                          hint="Open the highest-ROI submission: why it scored, and what to validate before funding"
+                          onClick={() => {
+                            setSortByRoi(true);
+                            setExpanded(top.id);
+                          }}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
                 <div className="admin-toolbar">
                   <h2 style={{ margin: 0 }}>Ideas waitlist</h2>
                   <div className="admin-toolbar-actions">
@@ -617,7 +672,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                           decrypted && roi && isOpen ? (
                             <tr key={`${idea.id}-roi`} className="roi-detail-row">
                               <td colSpan={colSpan}>
-                                <div className="roi-detail">
+                                <div className="roi-detail" ref={focusRef}>
                                   <p className="roi-summary">{roi.summary}</p>
                                   <div className="roi-grid">
                                     {roi.dimensions.map((d) => (
@@ -674,7 +729,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                         </p>
                                         <div className="build-bars">
                                           <div className="build-bar-row">
-                                            <span className="build-bar-name">ForkLaunch</span>
+                                            <span className="build-bar-name">ForkLaunch + AI</span>
                                             <div className="build-bar">
                                               <div
                                                 className="build-bar-fill fl"
@@ -685,7 +740,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                             </div>
                                             <span className="build-bar-value">
                                               {money(roi.buildEstimate.forklaunch.costUsd)} ·{' '}
-                                              {roi.buildEstimate.forklaunch.devWeeks} wk
+                                              {roi.buildEstimate.forklaunch.vibeHours} vibe-coding hrs
                                             </span>
                                           </div>
                                           <div className="build-bar-row">

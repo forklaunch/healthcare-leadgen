@@ -10,7 +10,8 @@ import {
 import { themeStyle, type PortalConfig } from './config';
 import { EncryptText, ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
-import { DOCTOR_STEPS, GuidedSteps } from './guided';
+import { DOCTOR_STEPS, GuidedSteps, NextAction } from './guided';
+import { useGuidedFocus } from './focus';
 
 type Tab = 'submit' | 'vault' | 'how';
 
@@ -333,6 +334,10 @@ function SubmitTab({
   const [changes, setChanges] = useState<string[] | null>(null);
   const [evaluatedDraft, setEvaluatedDraft] = useState<{ title: string; body: string } | null>(null);
   const [sealedSection, setSealedSection] = useState<StorageSection | null>(null);
+  // Scrolls the evaluation results into view whenever a new one arrives.
+  const { focusRef, scrollToFocus } = useGuidedFocus(
+    evaluation ? `${evaluation.generatedBy}:${evaluation.dimensions.map((d) => d.score).join('-')}` : null
+  );
 
   if (!accessKey || !me) {
     return (
@@ -447,6 +452,30 @@ function SubmitTab({
     }
   };
 
+  const submitIdea = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await client.submitIdea(accessKey, { title, body });
+      setTitle('');
+      setBody('');
+      setEvaluation(null);
+      setPrevScores(null);
+      setFocus(null);
+      setChanges(null);
+      setEvaluatedDraft(null);
+      refreshMe();
+      // The proof moment: read the just-written row back, sealed
+      const inspector = await client.getStorageInspector(accessKey, false);
+      const ideaSection = inspector?.sections.find((s) => s.table === 'idea');
+      if (ideaSection) setSealedSection(ideaSection);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Submission failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const aiBusy = evaluating || improving !== null;
 
   const draftStale =
@@ -494,6 +523,59 @@ function SubmitTab({
         </h2>
         <GuidedSteps steps={DOCTOR_STEPS} current={guidedStep} />
         <p className="meta guided-hint">{guidedHint}</p>
+        {(() => {
+          // One button for whatever should happen next, so the flow never
+          // depends on the user picking the right control.
+          const ready = Boolean(title && body);
+          if (!evaluation) {
+            return (
+              <NextAction
+                label="Get AI evaluation"
+                hint={
+                  ready
+                    ? 'Score this draft through all three lenses'
+                    : 'Add a title and description to continue'
+                }
+                disabled={!ready || aiBusy || busy}
+                busy={evaluating}
+                onClick={() => void runEvaluation(focus)}
+              />
+            );
+          }
+          if (draftStale) {
+            return (
+              <NextAction
+                label="Re-evaluate"
+                hint="Your draft changed — refresh the scores"
+                disabled={!ready || aiBusy || busy}
+                busy={evaluating}
+                onClick={() => void runEvaluation(focus)}
+              />
+            );
+          }
+          if (weakest && weakest.score < 70) {
+            return (
+              <NextAction
+                label={`Strengthen ${weakest.name}`}
+                hint={`AI rewrites your draft to raise its weakest lens (${weakest.score}/100)`}
+                disabled={aiBusy || busy}
+                busy={improving !== null}
+                onClick={() =>
+                  void focusAndImprove(weakest.key as EvaluationFocus)
+                }
+              />
+            );
+          }
+          return (
+            <NextAction
+              label="Submit idea"
+              hint="Strong across all three lenses — seal and send it"
+              disabled={!ready || aiBusy || busy}
+              busy={busy}
+              onClick={() => void submitIdea()}
+            />
+          );
+        })()}
         <label>Title</label>
         <input
           className="submit-title"
@@ -575,38 +657,14 @@ function SubmitTab({
           <button
             className={evaluation ? 'primary' : 'secondary'}
             disabled={busy || aiBusy || !title || !body}
-            onClick={async () => {
-              setBusy(true);
-              setError(null);
-              try {
-                await client.submitIdea(accessKey, { title, body });
-                setTitle('');
-                setBody('');
-                setEvaluation(null);
-                setPrevScores(null);
-                setFocus(null);
-                setChanges(null);
-                setEvaluatedDraft(null);
-                refreshMe();
-                // The proof moment: read the just-written row back, sealed
-                const inspector = await client.getStorageInspector(accessKey, false);
-                const ideaSection = inspector?.sections.find(
-                  (s) => s.table === 'idea'
-                );
-                if (ideaSection) setSealedSection(ideaSection);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : 'Submission failed');
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onClick={() => void submitIdea()}
           >
             Submit idea
           </button>
         </div>
       </div>
       {evaluation && (
-        <div className="card">
+        <div className="card" ref={focusRef}>
           <h2>
             AI evaluation
             <span className="badge">{evaluation.generatedBy}</span>

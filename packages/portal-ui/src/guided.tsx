@@ -43,6 +43,40 @@ export function GuidedSteps({
   );
 }
 
+/**
+ * The single most useful thing to do right now, as a button. Keeps the
+ * guided flow moving without making the user hunt for the right control.
+ */
+export function NextAction({
+  label,
+  hint,
+  onClick,
+  disabled,
+  busy
+}: {
+  label: string;
+  hint?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <div className="next-action">
+      <div className="next-action-text">
+        <span className="next-action-eyebrow">Next step</span>
+        {hint && <span className="meta">{hint}</span>}
+      </div>
+      <button
+        className="primary next-action-btn"
+        onClick={onClick}
+        disabled={disabled || busy}
+      >
+        {busy ? 'Working…' : label} <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  );
+}
+
 export const DOCTOR_STEPS: GuidedStep[] = [
   { title: 'Draft', detail: 'Describe the problem and your fix' },
   { title: 'AI evaluation', detail: 'Scored /100 through three lenses' },

@@ -863,7 +863,7 @@ ul.feedback li::marker { color: var(--accent); }
 }
 .build-estimate .badge { margin-left: 0.5rem; }
 .build-bars { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.5rem 0; }
-.build-bar-row { display: grid; grid-template-columns: 92px 1fr 110px; align-items: center; gap: 0.6rem; }
+.build-bar-row { display: grid; grid-template-columns: 108px 1fr 150px; align-items: center; gap: 0.6rem; }
 .build-bar-name { font-size: 0.78rem; font-weight: 700; }
 .build-bar { height: 12px; border-radius: 999px; background: var(--paper); overflow: hidden; }
 .build-bar-fill { height: 100%; border-radius: 999px; }
@@ -875,4 +875,41 @@ ul.feedback li::marker { color: var(--accent); }
   font-weight: 800;
   color: var(--ok);
   margin: 0.3rem 0 0.2rem;
+}
+
+/* ---- Next-action bar ---- */
+.next-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.2rem 0 1.2rem;
+  padding: 0.8rem 0.9rem 0.8rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    100deg,
+    var(--accent-soft),
+    color-mix(in srgb, var(--accent-soft) 40%, var(--card))
+  );
+}
+.next-action-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 12rem; }
+.next-action-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.portal-root button.primary.next-action-btn { white-space: nowrap; }
+
+/* ---- Guided focus pulse ---- */
+@keyframes focus-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+.focus-pulse { animation: focus-pulse 1100ms ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .focus-pulse { animation: none; }
 }

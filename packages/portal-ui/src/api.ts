@@ -32,7 +32,9 @@ export interface RoiDimension {
 /** Implementation cost comparison: building on ForkLaunch vs from scratch. */
 export interface BuildEstimate {
   complexity: string;
-  forklaunch: { devWeeks: number; costUsd: number };
+  /** AI-assisted build on scaffolded infra — measured in vibe-coding hours. */
+  forklaunch: { vibeHours: number; costUsd: number };
+  /** Traditional from-scratch build — measured in dev-weeks. */
   custom: { devWeeks: number; costUsd: number };
   savingsPct: number;
   rationale: string;

@@ -4,7 +4,8 @@ export { PortalWithAdmin } from './root';
 export { EncryptionShowcase } from './showcase';
 export { ScrambleText, randomCipher } from './scramble';
 export { AiThinking } from './thinking';
-export { GuidedSteps, DOCTOR_STEPS, ADMIN_STEPS } from './guided';
+export { GuidedSteps, NextAction, DOCTOR_STEPS, ADMIN_STEPS } from './guided';
+export { useGuidedFocus } from './focus';
 export { PortalClient, AdminClient } from './api';
 export type {
   AddAdminResult,

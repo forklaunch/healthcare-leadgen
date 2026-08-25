@@ -19,6 +19,10 @@ export const ROI_DIMENSIONS = {
 
 export type RoiDimensionKey = keyof typeof ROI_DIMENSIONS;
 
+/** Rate card behind build estimates; keep in sync with the ROI prompt. */
+const VIBE_HOUR_RATE_USD = 200;
+const DEV_WEEK_RATE_USD = 12_500;
+
 export interface RoiDimension {
   key: string;
   name: string;
@@ -31,11 +35,15 @@ export interface RoiDimension {
   validationSteps: string[];
 }
 
-/** Implementation cost comparison: building on ForkLaunch vs from scratch. */
+/**
+ * Implementation cost comparison. The ForkLaunch path is AI-assisted
+ * ("vibe coding") on scaffolded infrastructure and is measured in hours;
+ * the custom path is a traditional build measured in dev-weeks.
+ */
 export interface BuildEstimate {
-  /** trivial | moderate | complex | very-complex */
+  /** trivial | moderate | complex | very-complex | none */
   complexity: string;
-  forklaunch: { devWeeks: number; costUsd: number };
+  forklaunch: { vibeHours: number; costUsd: number };
   custom: { devWeeks: number; costUsd: number };
   savingsPct: number;
   rationale: string;
@@ -102,10 +110,10 @@ For each axis give:
 - concerns: 1-3 bullets naming the gaps, risks, or unknowns that HELD THE SCORE DOWN (be specific — these explain the score to a skeptical administrator)
 - validationSteps: 2-4 concrete data pulls or measurements an administrator should run to validate the ROI before funding (e.g. "Pull average LOS for DRG 470 patients in the affected unit for the last 12 months")
 
-Also estimate the software implementation cost IF the idea requires building software (most workflow/digital ideas do). Compare two paths honestly:
-- forklaunch: built on the ForkLaunch platform — scaffolded services, built-in per-tenant PHI encryption + RLS, auth, deploys, observability, and shared-infrastructure hosting are inherited rather than built. Typically cuts infrastructure/compliance engineering by 60-80% for CRUD-and-workflow apps; less dramatic for algorithmically novel systems.
-- custom: built from scratch on raw cloud primitives, including the HIPAA-grade encryption, tenancy, auth, deploy pipeline, and monitoring work ForkLaunch would otherwise provide.
-Use $12,500 per dev-week blended. If the idea needs no software at all, set complexity "none" and zero the numbers.
+Also estimate the software implementation cost IF the idea requires building software (most workflow/digital ideas do). Compare two paths honestly — they are measured in DIFFERENT units because they are different kinds of work:
+- forklaunch: AI-assisted ("vibe coding") on the ForkLaunch platform. The CLI scaffolds the services; per-tenant PHI encryption, RLS, auth, deploys, observability, and shared-infrastructure hosting are inherited, not built. What remains is describing the domain logic to an AI coding agent and reviewing its output — measure this in HOURS (vibeHours). A typical CRUD/workflow app is 8-40 vibe hours; algorithmically novel systems more. Cost at $200/hour.
+- custom: a traditional from-scratch build on raw cloud primitives, including all the HIPAA-grade encryption, tenancy, auth, deploy pipeline, and monitoring work ForkLaunch would otherwise provide — measure in dev-weeks at $12,500/week blended.
+If the idea needs no software at all, set complexity "none" and zero the numbers.
 
 Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
 {
@@ -117,7 +125,7 @@ Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
   ],
   "buildEstimate": {
     "complexity": "trivial|moderate|complex|very-complex|none",
-    "forklaunch": { "devWeeks": 0, "costUsd": 0 },
+    "forklaunch": { "vibeHours": 0, "costUsd": 0 },
     "custom": { "devWeeks": 0, "costUsd": 0 },
     "savingsPct": 0,
     "rationale": "1-2 sentences on what drives the estimate and the delta"
@@ -406,7 +414,7 @@ export class IdeaEvaluationService {
       }>;
       buildEstimate?: {
         complexity?: string;
-        forklaunch?: { devWeeks?: number; costUsd?: number };
+        forklaunch?: { vibeHours?: number; costUsd?: number };
         custom?: { devWeeks?: number; costUsd?: number };
         savingsPct?: number;
         rationale?: string;
@@ -450,21 +458,33 @@ export class IdeaEvaluationService {
     });
 
     const be = parsed.buildEstimate;
-    const buildEstimate: BuildEstimate | undefined = be
-      ? {
-          complexity: be.complexity?.trim() || 'moderate',
-          forklaunch: {
-            devWeeks: Math.max(0, Math.round(be.forklaunch?.devWeeks ?? 0)),
-            costUsd: Math.max(0, Math.round(be.forklaunch?.costUsd ?? 0))
-          },
-          custom: {
-            devWeeks: Math.max(0, Math.round(be.custom?.devWeeks ?? 0)),
-            costUsd: Math.max(0, Math.round(be.custom?.costUsd ?? 0))
-          },
-          savingsPct: Math.max(0, Math.min(100, Math.round(be.savingsPct ?? 0))),
-          rationale: be.rationale?.trim() || ''
-        }
-      : undefined;
+    let buildEstimate: BuildEstimate | undefined;
+    if (be) {
+      const vibeHours = Math.max(0, Math.round(be.forklaunch?.vibeHours ?? 0));
+      const devWeeks = Math.max(0, Math.round(be.custom?.devWeeks ?? 0));
+      // Derive costs from the rate card when the model omits or fumbles them,
+      // then compute savings from the costs — models are unreliable at the
+      // arithmetic and an inconsistent headline number reads as sloppy.
+      const flCost = be.forklaunch?.costUsd
+        ? Math.max(0, Math.round(be.forklaunch.costUsd))
+        : vibeHours * VIBE_HOUR_RATE_USD;
+      const customCost = be.custom?.costUsd
+        ? Math.max(0, Math.round(be.custom.costUsd))
+        : devWeeks * DEV_WEEK_RATE_USD;
+      buildEstimate = {
+        complexity: be.complexity?.trim() || 'moderate',
+        forklaunch: { vibeHours, costUsd: flCost },
+        custom: { devWeeks, costUsd: customCost },
+        savingsPct:
+          customCost > 0
+            ? Math.max(
+                0,
+                Math.min(100, Math.round((1 - flCost / customCost) * 100))
+              )
+            : 0,
+        rationale: be.rationale?.trim() || ''
+      };
+    }
 
     return {
       summary: parsed.summary?.trim() || 'No overall ROI summary returned.',
@@ -509,9 +529,9 @@ export class IdeaEvaluationService {
       dimensions,
       buildEstimate: {
         complexity: 'moderate',
-        forklaunch: { devWeeks: 6, costUsd: 75000 },
+        forklaunch: { vibeHours: 24, costUsd: 4800 },
         custom: { devWeeks: 22, costUsd: 275000 },
-        savingsPct: 73,
+        savingsPct: 98,
         rationale:
           'Offline sample estimate — connect a Foundry endpoint for a real analysis.'
       }

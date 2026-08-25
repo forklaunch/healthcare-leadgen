@@ -498,11 +498,35 @@ export class PortalService {
 
 export class IdeaNotFoundError extends Error {}
 
-function parseRoiScore(serialized: string | null | undefined): RoiScore | undefined {
+/**
+ * Reads a persisted ROI score, upgrading older stored shapes to the current
+ * one. Scores written before the estimate moved to AI-assisted "vibe hours"
+ * carry `forklaunch.devWeeks`; they are converted rather than dropped so
+ * historical ideas keep rendering (a re-score overwrites with fresh data).
+ */
+function parseRoiScore(
+  serialized: string | null | undefined
+): RoiScore | undefined {
   if (!serialized) return undefined;
+  let parsed: RoiScore & {
+    buildEstimate?: { forklaunch?: { devWeeks?: number; vibeHours?: number } };
+  };
   try {
-    return JSON.parse(serialized) as RoiScore;
+    parsed = JSON.parse(serialized);
   } catch {
     return undefined;
   }
+
+  const fl = parsed.buildEstimate?.forklaunch;
+  if (fl && typeof fl.vibeHours !== 'number') {
+    // Legacy: one dev-week of platform work ≈ 5 vibe-coding hours.
+    fl.vibeHours = Math.max(0, Math.round((fl.devWeeks ?? 0) * 5));
+  }
+
+  const dims = Array.isArray(parsed.dimensions) ? parsed.dimensions : [];
+  for (const d of dims) {
+    if (!Array.isArray(d.strengths)) d.strengths = [];
+    if (!Array.isArray(d.concerns)) d.concerns = [];
+  }
+  return parsed;
 }

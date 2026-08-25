@@ -477,6 +477,27 @@ export class PortalService {
   };
 
   /**
+   * Records the funding decision an administrator reaches after reviewing an
+   * idea's scores and validation steps — the terminal step of the review
+   * flow. Idempotent: setting the same status again is a no-op.
+   */
+  adminSetIdeaStatus = async (ideaId: string, status: string) => {
+    const allowed = Object.values(IdeaStatusEnum) as string[];
+    if (!allowed.includes(status)) {
+      throw new InvalidIdeaStatusError(
+        `Status must be one of: ${allowed.join(', ')}`
+      );
+    }
+    const idea = await this.em.findOne(IdeaEntity, { id: ideaId });
+    if (!idea) {
+      throw new IdeaNotFoundError(`Idea ${ideaId} was not found`);
+    }
+    idea.status = status as IdeaStatusEnum;
+    await this.em.flush();
+    return { id: idea.id, status: idea.status };
+  };
+
+  /**
    * AI-scores a submitted idea on the administrator ROI axes (length-of-stay
    * reduction, throughput improvement, patient satisfaction) and persists the
    * result on the idea. Re-scoring overwrites the previous score.
@@ -497,6 +518,7 @@ export class PortalService {
 }
 
 export class IdeaNotFoundError extends Error {}
+export class InvalidIdeaStatusError extends Error {}
 
 /**
  * Reads a persisted ROI score, upgrading older stored shapes to the current

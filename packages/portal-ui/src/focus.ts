@@ -30,11 +30,18 @@ export function useGuidedFocus(key: string | null) {
     el.classList.add('focus-pulse');
   }, []);
 
+  const mounted = useRef(false);
   useEffect(() => {
+    // Only the value present at mount is skipped (so a page load doesn't
+    // yank the viewport). Every focus change after that scrolls, including
+    // the first one the user triggers.
+    if (!mounted.current) {
+      mounted.current = true;
+      seen.current = key;
+      return;
+    }
     if (!key || seen.current === key) return;
-    const first = seen.current === null;
     seen.current = key;
-    if (first) return;
     // Let the newly-rendered section paint before scrolling to it.
     const id = window.setTimeout(scrollToFocus, 80);
     return () => window.clearTimeout(id);

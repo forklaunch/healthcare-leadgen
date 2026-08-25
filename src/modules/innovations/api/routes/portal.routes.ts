@@ -3,6 +3,7 @@ import {
   acceptNda,
   adminListIdeas,
   adminScoreIdeaRoi,
+  adminSetIdeaStatus,
   evaluateIdea,
   getMe,
   refineIdea,
@@ -48,4 +49,8 @@ export const adminListIdeasRoute = adminRouter.get('/ideas', adminListIdeas);
 export const adminScoreIdeaRoiRoute = adminRouter.post(
   '/ideas/:ideaId/roi-score',
   adminScoreIdeaRoi
+);
+export const adminSetIdeaStatusRoute = adminRouter.patch(
+  '/ideas/:ideaId/status',
+  adminSetIdeaStatus
 );

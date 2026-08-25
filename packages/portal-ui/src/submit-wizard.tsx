@@ -8,6 +8,7 @@ import type {
 } from './api';
 import type { PortalConfig } from './config';
 import { AiThinking } from './thinking';
+import { useGuidedFocus } from './focus';
 
 /**
  * One-question-at-a-time submission flow. Each step owns the whole card,
@@ -66,7 +67,9 @@ export function SubmitWizard({
 
   const titleRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
-  const cardRef = useRef<HTMLDivElement | null>(null);
+  // Shared with the admin console so both portals scroll and pulse the
+  // section that needs attention in exactly the same way.
+  const { focusRef: cardRef } = useGuidedFocus(step);
 
   const index = STEPS.findIndex((s) => s.id === step);
   const aiBusy = evaluating || improving !== null;
@@ -75,18 +78,9 @@ export function SubmitWizard({
     evaluatedDraft !== null &&
     (evaluatedDraft.title !== title || evaluatedDraft.body !== body);
 
-  // Focus the step's input and bring the card into view on every advance.
+  // Focus the step's input once the new step has painted (the hook handles
+  // scrolling the card itself into view).
   useEffect(() => {
-    const el = cardRef.current;
-    if (el) {
-      const reduced = window.matchMedia?.(
-        '(prefers-reduced-motion: reduce)'
-      )?.matches;
-      el.scrollIntoView({
-        behavior: reduced ? 'auto' : 'smooth',
-        block: 'center'
-      });
-    }
     const id = window.setTimeout(() => {
       if (step === 'title') titleRef.current?.focus();
       if (step === 'body') bodyRef.current?.focus();

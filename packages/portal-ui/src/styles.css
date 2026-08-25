@@ -1167,3 +1167,25 @@ ul.feedback li::marker { color: var(--accent); }
   margin-top: 0.12rem;
 }
 .build-method-body .meta { font-size: 0.74rem; line-height: 1.5; margin: 0.35rem 0 0; }
+
+/* ---- Funding decision (terminal step of the review flow) ---- */
+.decision {
+  margin: 1rem 0 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  max-width: 560px;
+}
+.decision .roi-validate-label { margin-top: 0; }
+.decision-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+.portal-root .decision-actions button.primary.small,
+.portal-root .decision-actions button.secondary.small {
+  padding: 0.36rem 0.8rem;
+  font-size: 0.8rem;
+}

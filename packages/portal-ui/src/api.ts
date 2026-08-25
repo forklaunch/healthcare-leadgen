@@ -363,6 +363,28 @@ export class AdminClient {
     return json.ideas;
   }
 
+  /** Records the administrator's review decision for one idea. */
+  async setIdeaStatus(
+    token: string,
+    ideaId: string,
+    organizationId: string,
+    status: 'under_review' | 'accepted' | 'declined'
+  ): Promise<{ id: string; status: string }> {
+    const res = await fetch(
+      `${this.apiUrl}/admin/ideas/${encodeURIComponent(ideaId)}/status?organization=${encodeURIComponent(organizationId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      }
+    );
+    if (!res.ok) throw new Error('Could not record the decision');
+    return res.json();
+  }
+
   async listAdmins(token: string): Promise<AdminSummary[]> {
     const res = await fetch(`${this.iamUrl}/admins`, {
       headers: { Authorization: `Bearer ${token}` }

@@ -1,4 +1,4 @@
-import { handlers, optional, ROLES, schemaValidator, string } from '@uchicago-ideas/core';
+import { handlers, optional, ROLES, schemaValidator, string, uuid } from '@uchicago-ideas/core';
 import { buildNdaText, CURRENT_NDA_VERSION } from '../../domain/nda/mutual-nda';
 import {
   getOrganization,
@@ -25,6 +25,7 @@ import { EvaluationUnavailableError } from '../../domain/services/idea-evaluatio
 import {
   IdeaNotFoundError,
   InvalidAccessKeyError,
+  InvalidIdeaStatusError,
   NdaNotAcceptedError
 } from '../../domain/services/portal.service';
 import { ci, tokens } from '../../bootstrapper';
@@ -487,6 +488,55 @@ export const adminScoreIdeaRoi = handlers.post(
       }
       if (error instanceof EvaluationUnavailableError) {
         res.status(502).send(error.message);
+        return;
+      }
+      throw error;
+    }
+  }
+);
+
+export const adminSetIdeaStatus = handlers.patch(
+  schemaValidator,
+  '/ideas/:ideaId/status',
+  {
+    name: 'Admin Set Idea Status',
+    summary:
+      "Records an administrator's review decision for an idea (under_review, accepted, declined)",
+    access: 'protected',
+    auth: {
+      jwt: {
+        jwksPublicKeyUrl: JWKS_PUBLIC_KEY_URL
+      },
+      allowedRoles: new Set([ROLES.ADMIN, 'owner'])
+    },
+    params: { ideaId: string },
+    query: { organization: string },
+    body: { status: string },
+    responses: {
+      200: { id: uuid, status: string },
+      400: string,
+      404: string
+    }
+  },
+  async (req, res) => {
+    try {
+      res
+        .status(200)
+        .json(
+          await tenantScopedPortalService(
+            req.query.organization
+          ).adminSetIdeaStatus(req.params.ideaId, req.body.status)
+        );
+    } catch (error) {
+      if (
+        error instanceof UnknownOrganizationError ||
+        error instanceof InvalidIdeaStatusError
+      ) {
+        res.status(400).send(error.message);
+        return;
+      }
+      if (error instanceof IdeaNotFoundError) {
+        res.status(404).send(error.message);
         return;
       }
       throw error;

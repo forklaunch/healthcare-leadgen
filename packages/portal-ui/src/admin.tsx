@@ -67,6 +67,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [addResult, setAddResult] = useState<AddAdminResult | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
 
   const orgLocked = Boolean(config.organization);
   // Scrolls the opened ROI breakdown into view when a row is expanded or a
@@ -217,6 +218,35 @@ export function AdminApp({ config }: { config: AdminConfig }) {
     }
   };
 
+  /** Terminal step of the review flow: record the funding decision. */
+  const decide = async (
+    idea: AdminIdea,
+    status: 'under_review' | 'accepted' | 'declined'
+  ) => {
+    if (!token) return;
+    setDeciding(idea.id);
+    setError(null);
+    try {
+      const updated = await client.setIdeaStatus(
+        token,
+        idea.id,
+        idea.organizationId,
+        status
+      );
+      setIdeas((current) =>
+        current
+          ? current.map((i) =>
+              i.id === idea.id ? { ...i, status: updated.status } : i
+            )
+          : current
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not record the decision');
+    } finally {
+      setDeciding(null);
+    }
+  };
+
   const addAdmin = async () => {
     if (!token) return;
     setBusy(true);
@@ -264,8 +294,19 @@ export function AdminApp({ config }: { config: AdminConfig }) {
   const colSpan = orgLocked ? 5 : 6;
 
   // Admin guided position: sealed → 1, decrypted → 2, a "why" panel open →
-  // 3; validation steps live inside it → 4 is informational.
-  const adminStep = !token ? 0 : !decrypted ? 1 : expanded ? 3 : 2;
+  // 3, and 4 once that idea has a recorded decision.
+  const expandedIdea_ = ideas?.find((i) => i.id === expanded);
+  const expandedDecided =
+    expandedIdea_ !== undefined && expandedIdea_.status !== 'submitted';
+  const adminStep = !token
+    ? 0
+    : !decrypted
+      ? 1
+      : !expanded
+        ? 2
+        : expandedDecided
+          ? 4
+          : 3;
 
   return (
     <div className="portal-root portal-root--wide" style={themeStyle(config.theme)}>
@@ -380,21 +421,58 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                         />
                       );
                     }
-                    const top = [...(ideas ?? [])]
+                    // Highest-ROI idea that still has no recorded decision —
+                    // the review queue, worked top down.
+                    const byRoi = [...(ideas ?? [])]
                       .filter((i) => i.roiScore)
                       .sort(
                         (a, b) =>
                           (b.roiScore?.roiIndex ?? 0) - (a.roiScore?.roiIndex ?? 0)
-                      )[0];
-                    if (top && expanded !== top.id) {
+                      );
+                    const nextUndecided = byRoi.find(
+                      (i) => i.status === 'submitted' && i.id !== expanded
+                    );
+                    if (expanded && !expandedDecided) {
                       return (
                         <NextAction
-                          label={`Review top idea (ROI ${top.roiScore?.roiIndex})`}
-                          hint="Open the highest-ROI submission: why it scored, and what to validate before funding"
+                          label="Record a decision"
+                          hint="Work the validation steps, then shortlist, hold, or decline this idea"
+                          onClick={() => {
+                            const el = document.getElementById(
+                              `decision-${expanded}`
+                            );
+                            el?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center'
+                            });
+                            el?.classList.add('focus-pulse');
+                          }}
+                        />
+                      );
+                    }
+                    if (nextUndecided) {
+                      return (
+                        <NextAction
+                          label={`Review next idea (ROI ${nextUndecided.roiScore?.roiIndex})`}
+                          hint={
+                            expandedDecided
+                              ? 'Decision recorded — on to the next highest-ROI submission'
+                              : 'Open the highest-ROI submission still awaiting a decision'
+                          }
                           onClick={() => {
                             setSortByRoi(true);
-                            setExpanded(top.id);
+                            setExpanded(nextUndecided.id);
                           }}
+                        />
+                      );
+                    }
+                    if (byRoi.length > 0) {
+                      return (
+                        <NextAction
+                          label="All ideas reviewed"
+                          hint="Every scored submission has a recorded decision"
+                          disabled
+                          onClick={() => undefined}
                         />
                       );
                     }
@@ -919,6 +997,53 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                       change.
                                     </p>
                                   )}
+                                  <div
+                                    className="decision"
+                                    id={`decision-${idea.id}`}
+                                  >
+                                    <p className="roi-validate-label">
+                                      Funding decision
+                                      {idea.status !== 'submitted' && (
+                                        <span
+                                          className={`badge ${idea.status === 'accepted' ? 'ok' : idea.status === 'declined' ? 'warn' : 'gold'}`}
+                                        >
+                                          {idea.status.replace('_', ' ')}
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="meta">
+                                      Recorded against the idea and visible to the
+                                      program — run the validation steps above
+                                      first.
+                                    </p>
+                                    <div className="decision-actions">
+                                      <button
+                                        className="primary small"
+                                        disabled={deciding === idea.id}
+                                        onClick={() => void decide(idea, 'accepted')}
+                                      >
+                                        {deciding === idea.id
+                                          ? 'Saving…'
+                                          : 'Shortlist for funding'}
+                                      </button>
+                                      <button
+                                        className="secondary small"
+                                        disabled={deciding === idea.id}
+                                        onClick={() =>
+                                          void decide(idea, 'under_review')
+                                        }
+                                      >
+                                        Hold for review
+                                      </button>
+                                      <button
+                                        className="secondary small"
+                                        disabled={deciding === idea.id}
+                                        onClick={() => void decide(idea, 'declined')}
+                                      >
+                                        Decline
+                                      </button>
+                                    </div>
+                                  </div>
                                   <p className="meta">
                                     Scored by {roi.generatedBy} ·{' '}
                                     {new Date(roi.scoredAt).toLocaleString()}

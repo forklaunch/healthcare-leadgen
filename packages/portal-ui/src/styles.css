@@ -1189,3 +1189,15 @@ ul.feedback li::marker { color: var(--accent); }
   padding: 0.36rem 0.8rem;
   font-size: 0.8rem;
 }
+
+/* ---- Review focus: land on the top of the entry, clear of chrome ---- */
+tr[id^='idea-row-'] { scroll-margin-top: 1.2rem; }
+tr.row-open > td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.wizard { scroll-margin-top: 1.2rem; }
+.decision-confirm {
+  margin: 0.6rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ok);
+}
+.portal-root .decision-actions button.secondary.small.skip { opacity: 0.75; }

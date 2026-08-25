@@ -10,7 +10,7 @@ import { themeStyle, type AdminConfig } from './config';
 import { ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
 import { ADMIN_STEPS, GuidedSteps, NextAction } from './guided';
-import { useGuidedFocus } from './focus';
+import { useScrollToElementId } from './focus';
 
 const money = (n: number) =>
   n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
@@ -68,11 +68,15 @@ export function AdminApp({ config }: { config: AdminConfig }) {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [addResult, setAddResult] = useState<AddAdminResult | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
+  const [justDecided, setJustDecided] = useState<{
+    id: string;
+    status: string;
+  } | null>(null);
 
   const orgLocked = Boolean(config.organization);
-  // Scrolls the opened ROI breakdown into view when a row is expanded or a
-  // fresh score lands.
-  const { focusRef } = useGuidedFocus(expanded);
+  // Scrolls the opened idea's row to the top of the viewport whenever the
+  // review moves to a different idea.
+  useScrollToElementId(expanded ? `idea-row-${expanded}` : null);
 
   const client = useMemo(
     () => new AdminClient(config.apiUrl, config.iamUrl),
@@ -218,6 +222,15 @@ export function AdminApp({ config }: { config: AdminConfig }) {
     }
   };
 
+  /** Opens the next undecided idea by ROI rank (or clears the panel). */
+  const advanceToNext = (afterId: string) => {
+    const next = (ideas ?? [])
+      .filter((i) => i.roiScore && i.id !== afterId && i.status === 'submitted')
+      .sort((a, b) => (b.roiScore?.roiIndex ?? 0) - (a.roiScore?.roiIndex ?? 0))[0];
+    // Nothing left to review: collapse rather than reopening the same idea.
+    setExpanded(next ? next.id : null);
+  };
+
   /** Terminal step of the review flow: record the funding decision. */
   const decide = async (
     idea: AdminIdea,
@@ -233,13 +246,31 @@ export function AdminApp({ config }: { config: AdminConfig }) {
         idea.organizationId,
         status
       );
-      setIdeas((current) =>
-        current
-          ? current.map((i) =>
-              i.id === idea.id ? { ...i, status: updated.status } : i
-            )
-          : current
-      );
+      // Derive the next idea from the UPDATED list inside the setter — the
+      // `ideas` captured by this closure predates the status write.
+      let next: AdminIdea | undefined;
+      setIdeas((current) => {
+        if (!current) return current;
+        const updatedList = current.map((i) =>
+          i.id === idea.id ? { ...i, status: updated.status } : i
+        );
+        next = updatedList
+          .filter(
+            (i) => i.roiScore && i.id !== idea.id && i.status === 'submitted'
+          )
+          .sort(
+            (a, b) => (b.roiScore?.roiIndex ?? 0) - (a.roiScore?.roiIndex ?? 0)
+          )[0];
+        return updatedList;
+      });
+      // Recording a decision finishes this idea — move the review straight
+      // to the next one in the queue instead of leaving the decided idea
+      // open and the reviewer scrolled to the bottom of it.
+      setJustDecided({ id: idea.id, status: updated.status });
+      window.setTimeout(() => {
+        setExpanded(next ? next.id : null);
+        setJustDecided(null);
+      }, 1200);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision');
     } finally {
@@ -603,7 +634,11 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                         const isOpen = expanded === idea.id;
                         const isIdeaOpen = expandedIdea === idea.id;
                         return [
-                          <tr key={idea.id}>
+                          <tr
+                            key={idea.id}
+                            id={`idea-row-${idea.id}`}
+                            className={isOpen ? 'row-open' : undefined}
+                          >
                             <td>
                               <button
                                 className="idea-expand"
@@ -803,7 +838,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                           decrypted && roi && isOpen ? (
                             <tr key={`${idea.id}-roi`} className="roi-detail-row">
                               <td colSpan={colSpan}>
-                                <div className="roi-detail" ref={focusRef}>
+                                <div className="roi-detail">
                                   <p className="roi-summary">{roi.summary}</p>
                                   <div className="roi-grid">
                                     {roi.dimensions.map((d) => (
@@ -1042,7 +1077,22 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                       >
                                         Decline
                                       </button>
+                                      <button
+                                        className="secondary small skip"
+                                        disabled={deciding === idea.id}
+                                        onClick={() => advanceToNext(idea.id)}
+                                        title="Leave this idea undecided and move on"
+                                      >
+                                        Skip for now
+                                      </button>
                                     </div>
+                                    {justDecided?.id === idea.id && (
+                                      <p className="decision-confirm">
+                                        ✓ Recorded as{' '}
+                                        {justDecided.status.replace('_', ' ')} —
+                                        opening the next idea…
+                                      </p>
+                                    )}
                                   </div>
                                   <p className="meta">
                                     Scored by {roi.generatedBy} ·{' '}

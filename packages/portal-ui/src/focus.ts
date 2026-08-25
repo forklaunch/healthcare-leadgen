@@ -10,8 +10,10 @@ import { useCallback, useEffect, useRef } from 'react';
  * pulses so the eye lands in the right place. A null key scrolls nothing,
  * and the first render is skipped so page loads don't yank the viewport.
  */
-export function useGuidedFocus(key: string | null) {
-  const ref = useRef<HTMLDivElement | null>(null);
+export function useGuidedFocus<T extends HTMLElement = HTMLDivElement>(
+  key: string | null
+) {
+  const ref = useRef<T | null>(null);
   const seen = useRef<string | null>(null);
 
   const scrollToFocus = useCallback(() => {
@@ -20,9 +22,12 @@ export function useGuidedFocus(key: string | null) {
     const reduced = window.matchMedia?.(
       '(prefers-reduced-motion: reduce)'
     )?.matches;
+    // Top of the section, not its middle: for a tall panel, centering
+    // hides the heading and the scores above the fold. `scroll-margin-top`
+    // on the target keeps it clear of the sticky chrome.
     el.scrollIntoView({
       behavior: reduced ? 'auto' : 'smooth',
-      block: 'center'
+      block: 'start'
     });
     el.classList.remove('focus-pulse');
     // Reflow so the animation restarts when the same element re-focuses.
@@ -48,4 +53,43 @@ export function useGuidedFocus(key: string | null) {
   }, [key, scrollToFocus]);
 
   return { focusRef: ref, scrollToFocus };
+}
+
+/**
+ * Scrolls the element with `elementId` into view whenever the id changes.
+ *
+ * Preferred over `useGuidedFocus` when the focus target moves between
+ * siblings (e.g. an expanded table row): a single ref attached
+ * conditionally is subject to React's detach-after-attach ordering, which
+ * can null the ref out and silently skip the scroll. Looking the element up
+ * by id at scroll time has no such race.
+ */
+export function useScrollToElementId(elementId: string | null) {
+  const seen = useRef<string | null>(null);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      seen.current = elementId;
+      return;
+    }
+    if (!elementId || seen.current === elementId) return;
+    seen.current = elementId;
+    const id = window.setTimeout(() => {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const reduced = window.matchMedia?.(
+        '(prefers-reduced-motion: reduce)'
+      )?.matches;
+      el.scrollIntoView({
+        behavior: reduced ? 'auto' : 'smooth',
+        block: 'start'
+      });
+      el.classList.remove('focus-pulse');
+      void el.offsetWidth;
+      el.classList.add('focus-pulse');
+    }, 90);
+    return () => window.clearTimeout(id);
+  }, [elementId]);
 }

@@ -32,6 +32,12 @@ export interface PortalBranding {
   emailPlaceholder?: string;
   /** "Built on ForkLaunch" gallery items; sensible defaults when omitted. */
   showcase?: ShowcaseItem[];
+  /**
+   * Suppress the "powered by ForkLaunch" masthead mark for fully
+   * white-labeled customer deployments. Defaults to false: the product
+   * identity is ForkLaunch, themed for the institution.
+   */
+  whiteLabel?: boolean;
 }
 
 export interface PortalConfig {

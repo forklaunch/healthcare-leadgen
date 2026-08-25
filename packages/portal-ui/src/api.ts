@@ -24,7 +24,18 @@ export interface RoiDimension {
   name: string;
   score: number;
   rationale: string;
+  strengths?: string[];
+  concerns?: string[];
   validationSteps: string[];
+}
+
+/** Implementation cost comparison: building on ForkLaunch vs from scratch. */
+export interface BuildEstimate {
+  complexity: string;
+  forklaunch: { devWeeks: number; costUsd: number };
+  custom: { devWeeks: number; costUsd: number };
+  savingsPct: number;
+  rationale: string;
 }
 
 export interface RoiScore {
@@ -33,6 +44,7 @@ export interface RoiScore {
   generatedBy: string;
   scoredAt: string;
   dimensions: RoiDimension[];
+  buildEstimate?: BuildEstimate;
 }
 
 /** At-rest ciphertext for the PHI columns, exactly as stored in Postgres. */

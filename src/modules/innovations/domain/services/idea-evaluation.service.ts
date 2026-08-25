@@ -24,7 +24,21 @@ export interface RoiDimension {
   name: string;
   score: number;
   rationale: string;
+  /** What earned points: specifics in the idea that support this axis. */
+  strengths: string[];
+  /** What cost points: gaps, risks, or unknowns that held the score down. */
+  concerns: string[];
   validationSteps: string[];
+}
+
+/** Implementation cost comparison: building on ForkLaunch vs from scratch. */
+export interface BuildEstimate {
+  /** trivial | moderate | complex | very-complex */
+  complexity: string;
+  forklaunch: { devWeeks: number; costUsd: number };
+  custom: { devWeeks: number; costUsd: number };
+  savingsPct: number;
+  rationale: string;
 }
 
 export interface RoiScore {
@@ -33,6 +47,7 @@ export interface RoiScore {
   generatedBy: string;
   scoredAt: string;
   dimensions: RoiDimension[];
+  buildEstimate?: BuildEstimate;
 }
 
 export interface EvaluationDimension {
@@ -81,16 +96,32 @@ const ROI_SYSTEM_PROMPT = `You are a hospital operations and finance analyst sco
 
 Scores are 0-100 and reflect ROI potential, not idea quality in the abstract: a scientifically interesting idea with no operational lever scores low; a mundane idea that clearly removes a bottleneck scores high. Be a tough grader — reserve 80+ for ideas with a direct, plausible, quantifiable mechanism.
 
-For each axis, give a 1-2 sentence rationale grounded in the idea's specifics, and 2-4 validationSteps: the concrete data pulls or measurements an administrator should run to validate the ROI before funding (e.g. "Pull average LOS for DRG 470 patients in the affected unit for the last 12 months").
+For each axis give:
+- rationale: 1-2 sentences grounded in the idea's specifics
+- strengths: 1-3 bullets naming exactly what in the idea EARNED points on this axis
+- concerns: 1-3 bullets naming the gaps, risks, or unknowns that HELD THE SCORE DOWN (be specific — these explain the score to a skeptical administrator)
+- validationSteps: 2-4 concrete data pulls or measurements an administrator should run to validate the ROI before funding (e.g. "Pull average LOS for DRG 470 patients in the affected unit for the last 12 months")
+
+Also estimate the software implementation cost IF the idea requires building software (most workflow/digital ideas do). Compare two paths honestly:
+- forklaunch: built on the ForkLaunch platform — scaffolded services, built-in per-tenant PHI encryption + RLS, auth, deploys, observability, and shared-infrastructure hosting are inherited rather than built. Typically cuts infrastructure/compliance engineering by 60-80% for CRUD-and-workflow apps; less dramatic for algorithmically novel systems.
+- custom: built from scratch on raw cloud primitives, including the HIPAA-grade encryption, tenancy, auth, deploy pipeline, and monitoring work ForkLaunch would otherwise provide.
+Use $12,500 per dev-week blended. If the idea needs no software at all, set complexity "none" and zero the numbers.
 
 Respond with ONLY a JSON object, no markdown fences, in exactly this shape:
 {
   "summary": "2-3 sentence overall ROI assessment written for a hospital administrator",
   "dimensions": [
-    { "key": "lengthOfStay", "score": 0, "rationale": "...", "validationSteps": ["...", "..."] },
-    { "key": "throughput", "score": 0, "rationale": "...", "validationSteps": ["..."] },
-    { "key": "patientSatisfaction", "score": 0, "rationale": "...", "validationSteps": ["..."] }
-  ]
+    { "key": "lengthOfStay", "score": 0, "rationale": "...", "strengths": ["..."], "concerns": ["..."], "validationSteps": ["...", "..."] },
+    { "key": "throughput", "score": 0, "rationale": "...", "strengths": ["..."], "concerns": ["..."], "validationSteps": ["..."] },
+    { "key": "patientSatisfaction", "score": 0, "rationale": "...", "strengths": ["..."], "concerns": ["..."], "validationSteps": ["..."] }
+  ],
+  "buildEstimate": {
+    "complexity": "trivial|moderate|complex|very-complex|none",
+    "forklaunch": { "devWeeks": 0, "costUsd": 0 },
+    "custom": { "devWeeks": 0, "costUsd": 0 },
+    "savingsPct": 0,
+    "rationale": "1-2 sentences on what drives the estimate and the delta"
+  }
 }`;
 
 const SYSTEM_PROMPT = `You are an innovation evaluator for UChicago Medicine's physician ideas program. Physicians submit early-stage clinical, research, and operational ideas. Evaluate each idea honestly and rigorously through exactly three lenses:
@@ -369,8 +400,17 @@ export class IdeaEvaluationService {
         key?: string;
         score?: number;
         rationale?: string;
+        strengths?: string[];
+        concerns?: string[];
         validationSteps?: string[];
       }>;
+      buildEstimate?: {
+        complexity?: string;
+        forklaunch?: { devWeeks?: number; costUsd?: number };
+        custom?: { devWeeks?: number; costUsd?: number };
+        savingsPct?: number;
+        rationale?: string;
+      };
     };
     try {
       const start = raw.indexOf('{');
@@ -386,6 +426,11 @@ export class IdeaEvaluationService {
       );
     }
 
+    const cleanList = (xs?: string[]) =>
+      (xs ?? [])
+        .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+        .map((s) => s.trim());
+
     const byKey = new Map(
       (parsed.dimensions ?? []).map((d) => [d.key, d] as const)
     );
@@ -398,11 +443,28 @@ export class IdeaEvaluationService {
         name,
         score: clampScore(d?.score),
         rationale: d?.rationale?.trim() || 'No assessment returned.',
-        validationSteps: (d?.validationSteps ?? [])
-          .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
-          .map((s) => s.trim())
+        strengths: cleanList(d?.strengths),
+        concerns: cleanList(d?.concerns),
+        validationSteps: cleanList(d?.validationSteps)
       };
     });
+
+    const be = parsed.buildEstimate;
+    const buildEstimate: BuildEstimate | undefined = be
+      ? {
+          complexity: be.complexity?.trim() || 'moderate',
+          forklaunch: {
+            devWeeks: Math.max(0, Math.round(be.forklaunch?.devWeeks ?? 0)),
+            costUsd: Math.max(0, Math.round(be.forklaunch?.costUsd ?? 0))
+          },
+          custom: {
+            devWeeks: Math.max(0, Math.round(be.custom?.devWeeks ?? 0)),
+            costUsd: Math.max(0, Math.round(be.custom?.costUsd ?? 0))
+          },
+          savingsPct: Math.max(0, Math.min(100, Math.round(be.savingsPct ?? 0))),
+          rationale: be.rationale?.trim() || ''
+        }
+      : undefined;
 
     return {
       summary: parsed.summary?.trim() || 'No overall ROI summary returned.',
@@ -411,7 +473,8 @@ export class IdeaEvaluationService {
       ),
       generatedBy: this.foundryModel || 'foundry',
       scoredAt: new Date().toISOString(),
-      dimensions
+      dimensions,
+      buildEstimate
     };
   };
 
@@ -428,6 +491,8 @@ export class IdeaEvaluationService {
       name,
       score: clampScore(30 + detail + index * 7),
       rationale: `Offline sample ROI assessment of "${data.title}" for ${name.toLowerCase()} — connect a Foundry endpoint for a real analysis.`,
+      strengths: ['Offline sample — draft length only.'],
+      concerns: ['Offline sample — no real analysis performed.'],
       validationSteps: [
         `Identify the baseline metric this idea would move for ${name.toLowerCase()}.`,
         'Set FOUNDRY_ENDPOINT, FOUNDRY_API_KEY, and FOUNDRY_MODEL to enable real AI scoring.'
@@ -441,7 +506,15 @@ export class IdeaEvaluationService {
       ),
       generatedBy: 'offline-sample',
       scoredAt: new Date().toISOString(),
-      dimensions
+      dimensions,
+      buildEstimate: {
+        complexity: 'moderate',
+        forklaunch: { devWeeks: 6, costUsd: 75000 },
+        custom: { devWeeks: 22, costUsd: 275000 },
+        savingsPct: 73,
+        rationale:
+          'Offline sample estimate — connect a Foundry endpoint for a real analysis.'
+      }
     };
   };
 

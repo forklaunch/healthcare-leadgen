@@ -10,6 +10,7 @@ import {
 import { themeStyle, type PortalConfig } from './config';
 import { EncryptText, ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
+import { DOCTOR_STEPS, GuidedSteps } from './guided';
 
 type Tab = 'submit' | 'vault' | 'how';
 
@@ -356,6 +357,7 @@ function SubmitTab({
             <span className="stat-chip">AI scoring under the Azure BAA</span>
             <span className="stat-chip maroon">Top 7 ideas get built</span>
           </div>
+          <GuidedSteps steps={DOCTOR_STEPS} current={0} />
         </section>
         {flash && <div className="notice ok" style={{ marginBottom: '1rem' }}>{flash}</div>}
         <RequestAccessCard client={client} config={config} onDone={setFlash} />
@@ -452,6 +454,25 @@ function SubmitTab({
     evaluatedDraft !== null &&
     (evaluatedDraft.title !== title || evaluatedDraft.body !== body);
 
+  // Where the doctor is in the guided journey (drives the stepper).
+  const guidedStep = sealedSection
+    ? 5
+    : busy
+      ? 4
+      : evaluation
+        ? 3
+        : evaluating
+          ? 2
+          : 1;
+  const weakest = evaluation
+    ? [...evaluation.dimensions].sort((a, b) => a.score - b.score)[0]
+    : null;
+  const guidedHint = !evaluation
+    ? 'Start with a rough draft — the AI evaluation will tell you exactly what to sharpen.'
+    : weakest && weakest.score < 70
+      ? `Your weakest lens is ${weakest.name} (${weakest.score}/100) — one click below rewrites the draft to strengthen it, or submit as-is.`
+      : 'Strong across all three lenses — submit when you’re ready.';
+
   return (
     <>
       {sealedSection && (
@@ -471,6 +492,8 @@ function SubmitTab({
           Submit an idea
           <span className="badge ok">NDA executed ({me.acceptedNdaVersion})</span>
         </h2>
+        <GuidedSteps steps={DOCTOR_STEPS} current={guidedStep} />
+        <p className="meta guided-hint">{guidedHint}</p>
         <label>Title</label>
         <input
           className="submit-title"
@@ -981,6 +1004,16 @@ export function PortalApp({ config }: { config: PortalConfig }) {
           <p className="eyebrow">{config.branding.institution}</p>
           <h1>{config.branding.portalName}</h1>
           <p>{config.branding.tagline}</p>
+          {!config.branding.whiteLabel && (
+            <a
+              className="powered-by"
+              href="https://forklaunch.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              ⚡ powered by <strong>ForkLaunch</strong>
+            </a>
+          )}
         </div>
       </header>
       <nav className="tabs">

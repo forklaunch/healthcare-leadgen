@@ -9,6 +9,10 @@ import {
 import { themeStyle, type AdminConfig } from './config';
 import { ScrambleText } from './scramble';
 import { AiThinking } from './thinking';
+import { ADMIN_STEPS, GuidedSteps } from './guided';
+
+const money = (n: number) =>
+  n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
 
 function tier(score: number): 'high' | 'mid' | 'low' {
   if (score >= 70) return 'high';
@@ -255,13 +259,27 @@ export function AdminApp({ config }: { config: AdminConfig }) {
 
   const colSpan = orgLocked ? 5 : 6;
 
+  // Admin guided position: sealed → 1, decrypted → 2, a "why" panel open →
+  // 3; validation steps live inside it → 4 is informational.
+  const adminStep = !token ? 0 : !decrypted ? 1 : expanded ? 3 : 2;
+
   return (
-    <div className="portal-root" style={themeStyle(config.theme)}>
+    <div className="portal-root portal-root--wide" style={themeStyle(config.theme)}>
       <header className="masthead">
         <div className="shell">
           <p className="eyebrow">{branding.institution}</p>
           <h1>{branding.portalName}</h1>
           <p>{branding.tagline}</p>
+          {!config.branding?.whiteLabel && (
+            <a
+              className="powered-by"
+              href="https://forklaunch.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              ⚡ powered by <strong>ForkLaunch</strong>
+            </a>
+          )}
         </div>
       </header>
       <main>
@@ -326,6 +344,7 @@ export function AdminApp({ config }: { config: AdminConfig }) {
 
             {tab === 'ideas' ? (
               <div className="card">
+                {token && <GuidedSteps steps={ADMIN_STEPS} current={adminStep} />}
                 <div className="admin-toolbar">
                   <h2 style={{ margin: 0 }}>Ideas waitlist</h2>
                   <div className="admin-toolbar-actions">
@@ -615,6 +634,26 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                           />
                                         </div>
                                         <p className="meta">{d.rationale}</p>
+                                        {(d.strengths?.length ?? 0) > 0 && (
+                                          <>
+                                            <p className="roi-why-label ok">Why it scored points</p>
+                                            <ul className="roi-why">
+                                              {d.strengths?.map((s) => (
+                                                <li key={s}>{s}</li>
+                                              ))}
+                                            </ul>
+                                          </>
+                                        )}
+                                        {(d.concerns?.length ?? 0) > 0 && (
+                                          <>
+                                            <p className="roi-why-label warn">What held it back</p>
+                                            <ul className="roi-why">
+                                              {d.concerns?.map((c) => (
+                                                <li key={c}>{c}</li>
+                                              ))}
+                                            </ul>
+                                          </>
+                                        )}
                                         <p className="roi-validate-label">Validate before funding</p>
                                         <ul className="roi-validate">
                                           {d.validationSteps.map((step) => (
@@ -624,6 +663,54 @@ export function AdminApp({ config }: { config: AdminConfig }) {
                                       </div>
                                     ))}
                                   </div>
+                                  {roi.buildEstimate &&
+                                    roi.buildEstimate.complexity !== 'none' && (
+                                      <div className="build-estimate">
+                                        <p className="roi-validate-label">
+                                          Implementation cost — built on ForkLaunch vs custom
+                                          <span className="badge gold">
+                                            {roi.buildEstimate.complexity}
+                                          </span>
+                                        </p>
+                                        <div className="build-bars">
+                                          <div className="build-bar-row">
+                                            <span className="build-bar-name">ForkLaunch</span>
+                                            <div className="build-bar">
+                                              <div
+                                                className="build-bar-fill fl"
+                                                style={{
+                                                  width: `${Math.max(4, Math.round((roi.buildEstimate.forklaunch.costUsd / Math.max(1, roi.buildEstimate.custom.costUsd)) * 100))}%`
+                                                }}
+                                              />
+                                            </div>
+                                            <span className="build-bar-value">
+                                              {money(roi.buildEstimate.forklaunch.costUsd)} ·{' '}
+                                              {roi.buildEstimate.forklaunch.devWeeks} wk
+                                            </span>
+                                          </div>
+                                          <div className="build-bar-row">
+                                            <span className="build-bar-name">Custom build</span>
+                                            <div className="build-bar">
+                                              <div className="build-bar-fill custom" style={{ width: '100%' }} />
+                                            </div>
+                                            <span className="build-bar-value">
+                                              {money(roi.buildEstimate.custom.costUsd)} ·{' '}
+                                              {roi.buildEstimate.custom.devWeeks} wk
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <p className="build-savings">
+                                          {roi.buildEstimate.savingsPct}% less on ForkLaunch
+                                        </p>
+                                        <p className="meta">{roi.buildEstimate.rationale}</p>
+                                      </div>
+                                    )}
+                                  {roi.buildEstimate?.complexity === 'none' && (
+                                    <p className="meta">
+                                      No software build required — this idea is a process/staffing
+                                      change.
+                                    </p>
+                                  )}
                                   <p className="meta">
                                     Scored by {roi.generatedBy} ·{' '}
                                     {new Date(roi.scoredAt).toLocaleString()}

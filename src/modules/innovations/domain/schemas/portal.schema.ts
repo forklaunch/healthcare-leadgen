@@ -124,7 +124,17 @@ export const RoiDimensionSchema = {
   name: string,
   score: number,
   rationale: string,
+  strengths: optional(array(string)),
+  concerns: optional(array(string)),
   validationSteps: array(string)
+};
+
+export const BuildEstimateSchema = {
+  complexity: string,
+  forklaunch: { devWeeks: number, costUsd: number },
+  custom: { devWeeks: number, costUsd: number },
+  savingsPct: number,
+  rationale: string
 };
 
 export const RoiScoreResponseSchema = {
@@ -132,7 +142,8 @@ export const RoiScoreResponseSchema = {
   roiIndex: number,
   generatedBy: string,
   scoredAt: string,
-  dimensions: array(RoiDimensionSchema)
+  dimensions: array(RoiDimensionSchema),
+  buildEstimate: optional(BuildEstimateSchema)
 };
 
 // At-rest ciphertext for the PHI columns — always present so the admin table
